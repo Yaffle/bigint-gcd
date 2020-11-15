@@ -1,0 +1,26 @@
+{
+  "name": "bigint-gcd",
+  "version": "1.0.0",
+  "description": "greater common divisor (gcd) of two BigInt values using Lehmer's GCD algorithm",
+  "main": "gcd.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yaffle/bigint-gcd.git"
+  },
+  "keywords": [
+    "gcd",
+    "Euclid",
+    "Lehmer",
+    "greatest common divisor",
+    "BigInt"
+  ],
+  "author": "",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/Yaffle/bigint-gcd/issues"
+  },
+  "homepage": "https://github.com/Yaffle/bigint-gcd#readme"
+}
