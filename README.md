@@ -23,6 +23,7 @@ Benchmark:
 ==========
 
 ```javascript
+// Copy-paste the code from gcd.js .
 function FibonacciNumber(n) {
   console.assert(n > 0);
   var a = 0n;
@@ -44,7 +45,7 @@ for (let i = 0; i < count; i++) {
   }
 }
 console.timeEnd();
-// Chrome 86: default: 1000 ms
+// Chrome 86: default: 850 ms
 console.time();
 for (let i = 0; i < count; i++) {
   if (EuclidsGCD(a * BigInt(i), b * BigInt(i)) != i) {
@@ -52,5 +53,5 @@ for (let i = 0; i < count; i++) {
   }
 }
 console.timeEnd();
-// Chrome 86: default: 2300 ms
+// Chrome 86: default: 1900 ms
 ```
