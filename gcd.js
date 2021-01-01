@@ -2,7 +2,7 @@
 // https://en.wikipedia.org/wiki/Euclidean_algorithm#Method_of_least_absolute_remainders
 function numbersGCD(a, b) {
   while (b > 0) {
-    const r1 = a % b;
+    const r1 = a - Math.floor(a / b) * b;
     const r2 = b - r1;
     const r = r1 < r2 ? r1 : r2;
     a = b;
@@ -30,26 +30,33 @@ function EuclidsGCD(a, b) {
   return a;
 }
 
+// https://github.com/tc39/proposal-bigint/issues/205
 // https://github.com/tc39/ecma262/issues/1729
 function bitLength(a) {
-  const number = Number(a);
-  if (number < 1 / 0) {
-    return Math.floor(Math.log2(number)) + 1;
+  const s = a.toString(16);
+  const c = s.charCodeAt(0);
+  if (c === '-'.charCodeAt(0) || c === '0'.charCodeAt(0)) {
+    throw new RangeError();
   }
-  return a.toString(16).length * 4 + 4;
+  return (s.length - 1) * 4 + (32 - Math.clz32(Math.min(c - '0'.charCodeAt(0), 8)));
 }
 
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
 // this implementation is good after ~80 bits (?)
 function LehmersGCD(a, b) {
-  while (b >= Math.sqrt((Number.MAX_SAFE_INTEGER + 1)**3)) {
+  if (a < b) {
+    const tmp = a;
+    a = b;
+    b = tmp;
+  }
+  while (b >= Math.sqrt(Math.pow(Number.MAX_SAFE_INTEGER + 1, 3))) {
     console.assert(a >= b);
     const m = BigInt(Math.max(0, bitLength(a) - Math.floor(Math.log2(Number.MAX_SAFE_INTEGER + 1))));
     let x = Number(a >> m);
     let y = Number(b >> m);
-    //console.assert(x >= (Number.MAX_SAFE_INTEGER + 1) / 2 && x <= Number.MAX_SAFE_INTEGER);
-    //console.assert(y >= 0 && y <= Number.MAX_SAFE_INTEGER);
+    console.assert(x >= (Number.MAX_SAFE_INTEGER + 1) / 2 && x <= Number.MAX_SAFE_INTEGER);
+    console.assert(y >= 0 && y <= Number.MAX_SAFE_INTEGER);
     let A = 1;
     let B = 0;
     let C = 0;
@@ -76,13 +83,33 @@ function abs(a) {
   return a < 0 ? -a : a;
 }
 
+function ctz(a) {
+  // https://en.wikipedia.org/wiki/Find_first_set#Properties_and_relations
+  //return bitLength(a & (-a)) - 1;
+  const s = a.toString(16);
+  let n = s.length - 1;
+  while (s.charCodeAt(n) === '0'.charCodeAt(0)) {
+    n -= 1;
+  }
+  let x = s.charCodeAt(n);
+  if (x < 'a'.charCodeAt(0)) {
+    x -= '0'.charCodeAt(0);
+  } else {
+    x -= 'a'.charCodeAt(0);
+    x += 10;
+  }
+  return (s.length - 1 - n) * 4 + (31 - Math.clz32(x & -x));
+}
+
 function bigIntGCD(a, b) {
   a = abs(a);
   b = abs(b);
-  if (a < b) {
-    const tmp = a;
-    a = b;
-    b = tmp;
+  if (a > Number.MAX_SAFE_INTEGER && b > Number.MAX_SAFE_INTEGER) {
+    const c1 = ctz(a);
+    const c2 = ctz(b);
+    if (c1 > 4 || c2 > 4) {
+      return LehmersGCD(c1 === 0 ? a : a >> BigInt(c1), c2 === 0 ? b : b >> BigInt(c2)) << BigInt(Math.min(c1, c2));
+    }
   }
   return LehmersGCD(a, b);
 }
