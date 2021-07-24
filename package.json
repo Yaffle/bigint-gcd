@@ -1,6 +1,6 @@
 {
   "name": "bigint-gcd",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "greater common divisor (gcd) of two BigInt values using Lehmer's GCD algorithm",
   "main": "gcd.js",
   "scripts": {
@@ -14,6 +14,7 @@
     "gcd",
     "Euclid",
     "Lehmer",
+    "Subquadratic",
     "greatest common divisor",
     "BigInt"
   ],
