@@ -29,7 +29,7 @@ Performance:
 
 The benchmark (see benchmark.html) resutls under Chrome 93:
 
-|    size |    bigint-gcd | GMP (under PHP) |
+| bit size|    bigint-gcd | GMP (under PHP) |
 | ------- | ------------- | --------------- |
 |      64 |    0.002460ms |    0.001062ms   |
 |     128 |    0.007900ms |    0.001410ms   |
