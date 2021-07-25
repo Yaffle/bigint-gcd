@@ -295,9 +295,6 @@ function ctz(a) {
 }
 
 function bigIntGCD(a, b) {
-  if (typeof a === "number" && typeof b === "number") {
-    return numbersGCD(Math.abs(a), Math.abs(b));
-  }
   var na = Math.abs(Number(a));
   var nb = Math.abs(Number(b));
   if (na < nb) {
@@ -313,12 +310,12 @@ function bigIntGCD(a, b) {
   }
   if (nb <= Number.MAX_SAFE_INTEGER) {
     if (nb === 0) {
-      return a;
+      return abs(BigInt(a));
     }
     if (nb === 1) {
-      return 0;
+      return 1;
     }
-    return numbersGCD(nb, Number(a % BigInt(b)));
+    return numbersGCD(nb, Math.abs(Number(BigInt(a) % BigInt(b))));
   }
   a = abs(BigInt(a));
   b = abs(BigInt(b));
