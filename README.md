@@ -27,7 +27,7 @@ console.log(bigIntGCD(120n, 18n));
 Performance:
 ============
 
-The benchmark (see benchmark.html) resutls under Chrome 93:
+The benchmark (see [benchmark.html](benchmark.html)) resutls under Chrome 93:
 
 | bit size|    bigint-gcd | GMP (under PHP) |
 | ------- | ------------- | --------------- |
