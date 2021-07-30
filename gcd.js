@@ -165,7 +165,7 @@ function halfgcd(a, b, small) {
   // ([A, B], [C, D]) * (a + x, b + y) = (A*(a+x)+B*(b+y), C*(a+x)+D*(b+y)) = (A*a+B*b, C*a+D*b) + (A*x+B*y, C*x+D*y)
   //Note: for debugging it is useful to compare quotients in simple Euclidean algorithms vs quotients here
 
-  if (!small || Number(a) < Math.pow(Number.MAX_SAFE_INTEGER + 1, doubleDigitMethod ? 2 : 1)) {
+  if (small || Number(a) < Math.pow(Number.MAX_SAFE_INTEGER + 1, doubleDigitMethod ? 2 : 1)) {
     const [A, B, C, D] = helper(a, b);
     return [BigInt(A), BigInt(B), BigInt(C), BigInt(D), 0n, 0n];
   }
@@ -255,7 +255,7 @@ function LehmersGCD(a, b) {
     const m = BigInt(m1);
     const ahi = a >> m;
     const bhi = b >> m;
-    const [A, B, C, D, transformedAhi, transformedBhi] = halfgcd(ahi, bhi, useSubquadraticMethod);
+    const [A, B, C, D, transformedAhi, transformedBhi] = halfgcd(ahi, bhi, !useSubquadraticMethod);
     if (B === 0n) {
       //console.assert(A === 1n && B === 0n && C === 0n && D === 1n);
       //gcd.debug(a / b);
