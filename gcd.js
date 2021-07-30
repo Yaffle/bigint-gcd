@@ -16,13 +16,15 @@ function EuclidsGCD(a, b) {
     a = b;
     b = r;
   }
-  if (Number(b) > 0) {
-    if (Number(a) > Number.MAX_SAFE_INTEGER) {
-      const r = a % BigInt(b);
-      a = b;
-      b = r;
+  let nb = Number(b);
+  if (nb > 0) {
+    let na = Number(a);
+    if (na > Number.MAX_SAFE_INTEGER) {
+      const r = Number(a % BigInt(nb));
+      na = nb;
+      nb = r;
     }
-    return BigInt(numbersGCD(Number(a), Number(b)));
+    return numbersGCD(na, nb);
   }
   return a;
 }
@@ -41,7 +43,7 @@ function bitLength(a) {
 
 // 1 + floor(log2(x))
 function log2(x) {
-  var e = 0;
+  let e = 0;
   while (x > (1 << 30)) {
     x = Math.floor(x / (1 << 30));
     e += 30;
@@ -52,7 +54,7 @@ function log2(x) {
 
 const LOG2MAX = Math.floor(Math.log2(Number.MAX_SAFE_INTEGER + 1));
 
-var previousValue = -1;
+let previousValue = -1;
 // some terrible optimization as bitLength is slow
 function bitLength2(a) {
   if (previousValue === -1) {
@@ -82,11 +84,11 @@ function significand(value, doubleDigit) {
   if (!doubleDigit) {
     return [Number(value), 0];
   }
-  var lo = Number(BigInt.asUintN(LOG2MAX, value));
-  //var hi = Number(value >> p53);
+  const lo = Number(BigInt.asUintN(LOG2MAX, value));
+  //const hi = Number(value >> p53);
   // Instead doing something to save one BigInt operation:
-  var tmp = Number(value);  
-  var hi = Math.floor(tmp / (Number.MAX_SAFE_INTEGER + 1));
+  const tmp = Number(value);  
+  let hi = Math.floor(tmp / (Number.MAX_SAFE_INTEGER + 1));
   if (Math.floor(tmp - (Number.MAX_SAFE_INTEGER + 1) * hi) === 0) {
     if (lo > (Number.MAX_SAFE_INTEGER + 1) / 2) {
       hi -= 1;
@@ -100,7 +102,7 @@ function significand(value, doubleDigit) {
 
 // 2**n
 function exp2(n) {
-  var result = 1;
+  let result = 1;
   while (n > 30) {
     n -= 30;
     result *= (1 << 30);
@@ -244,18 +246,14 @@ function LehmersGCD(a, b) {
     a = b;
     b = tmp;
   }
-  let useSubquadraticMethod = true;
-  while (Number(b) >= Math.sqrt(Math.pow(Number.MAX_SAFE_INTEGER + 1, 3))) {
+
+  // Subquadratic Lehmer's algorithm:
+  while (Number(b) >= 1/0 && BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b) {
     //console.assert(a >= b);
     const n = bitLength2(a);
-    if (useSubquadraticMethod) {
-      useSubquadraticMethod = BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b;
-    }
-    const m1 = !useSubquadraticMethod ? Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)) : Math.floor(n / 2);
-    const m = BigInt(m1);
-    const ahi = a >> m;
-    const bhi = b >> m;
-    const [A, B, C, D, transformedAhi, transformedBhi] = halfgcd(ahi, bhi, !useSubquadraticMethod);
+    const m = Math.floor(n / 2);
+    const m1 = BigInt(m);
+    const [A, B, C, D, transformedAhi, transformedBhi] = halfgcd(a >> m1, b >> m1, false);
     if (B === 0n) {
       //console.assert(A === 1n && B === 0n && C === 0n && D === 1n);
       //gcd.debug(a / b);
@@ -263,16 +261,29 @@ function LehmersGCD(a, b) {
       a = b;
       b = r;
     } else {
-      if (!useSubquadraticMethod) {
-        [a, b] = [A * a + B * b, C * a + D * b]; // T * (a, b)
-      } else {
-        const alo = BigInt.asUintN(m1, a);
-        const blo = BigInt.asUintN(m1, b);
-        [a, b] = [(A * alo + B * blo) + (transformedAhi << m), (C * alo + D * blo) + (transformedBhi << m)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
-      }
-      //console.assert(a >= b && b > 0n);
+      const alo = BigInt.asUintN(m, a);
+      const blo = BigInt.asUintN(m, b);
+      [a, b] = [(A * alo + B * blo) + (transformedAhi << m1), (C * alo + D * blo) + (transformedBhi << m1)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
     }
   }
+
+  // Lehmer's algorithm:
+  while (Number(b) >= Math.sqrt(Math.pow(Number.MAX_SAFE_INTEGER + 1, 3))) {
+    //console.assert(a >= b);
+    const n = bitLength2(a);
+    const m = Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1));
+    const [A, B, C, D] = helper(a >> BigInt(m), b >> BigInt(m));
+    if (B === 0) {
+      //console.assert(A === 1 && B === 0 && C === 0 && D === 1);
+      //gcd.debug(a / b);
+      const r = a % b;
+      a = b;
+      b = r;
+    } else {
+      [a, b] = [BigInt(A) * a + BigInt(B) * b, BigInt(C) * a + BigInt(D) * b]; // T * (a, b)
+    }
+  }
+
   return EuclidsGCD(a, b);
 }
 
@@ -295,8 +306,8 @@ function ctz(a) {
     x -= 'a'.charCodeAt(0);
     x += 10;
   }
-  //var e = (31 - Math.clz32(x & -x));
-  var e = 0;
+  //let e = (31 - Math.clz32(x & -x));
+  let e = 0;
   while (x % 2 === 0) {
     x /= 2;
     e += 1;
@@ -305,13 +316,13 @@ function ctz(a) {
 }
 
 function bigIntGCD(a, b) {
-  var na = Math.abs(Number(a));
-  var nb = Math.abs(Number(b));
+  let na = Math.abs(Number(a));
+  let nb = Math.abs(Number(b));
   if (na < nb) {
-    var tmp = a;
+    const tmp = a;
     a = b;
     b = tmp;
-    var tmp1 = na;
+    const tmp1 = na;
     na = nb;
     nb = tmp1;
   }
@@ -335,7 +346,7 @@ function bigIntGCD(a, b) {
     if (c1 > 4 || c2 > 4) {
       const g = LehmersGCD(c1 === 0 ? a : a >> BigInt(c1), c2 === 0 ? b : b >> BigInt(c2));
       const c = Math.min(c1, c2);
-      return c === 0 ? g : (g << BigInt(c));
+      return c === 0 ? g : (BigInt(g) << BigInt(c));
     }
   }
   return LehmersGCD(a, b);
