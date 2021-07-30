@@ -56,10 +56,19 @@ var previousValue = -1;
 // some terrible optimization as bitLength is slow
 function bitLength2(a) {
   if (previousValue === -1) {
-    previousValue = bitLength(a)
+    previousValue = bitLength(a);
     return previousValue;
   }
-  var n = Number(a >> BigInt(previousValue - LOG2MAX));
+  if (previousValue <= 1024) {
+    let n = Number(a);
+    let x = Math.log2(n) + 1024 * 4 - 1024 * 4;
+    let y = Math.ceil(x);
+    if (x !== y) {
+      previousValue = y;
+      return y;
+    }
+  }
+  let n = Number(a >> BigInt(previousValue - LOG2MAX));
   if (n < 1 || n >= (Number.MAX_SAFE_INTEGER + 1)) {
     previousValue = -1;
     return bitLength2(a);
@@ -146,7 +155,7 @@ function helper(xx, yy) {
   return [A, B, C, D];
 }
 
-function halfgcd(a, b, useSubquadraticMethod) {
+function halfgcd(a, b, small) {
   //console.assert(a >= b && b >= 0n);
 
   // the function calculates the transformation matrix for numbers (x, y), where a <= x < a + 1 and b <= y < b + 1
@@ -156,7 +165,7 @@ function halfgcd(a, b, useSubquadraticMethod) {
   // ([A, B], [C, D]) * (a + x, b + y) = (A*(a+x)+B*(b+y), C*(a+x)+D*(b+y)) = (A*a+B*b, C*a+D*b) + (A*x+B*y, C*x+D*y)
   //Note: for debugging it is useful to compare quotients in simple Euclidean algorithms vs quotients here
 
-  if (!useSubquadraticMethod || Number(a) < Math.pow(Number.MAX_SAFE_INTEGER + 1, 2)) {
+  if (!small || Number(a) < Math.pow(Number.MAX_SAFE_INTEGER + 1, doubleDigitMethod ? 2 : 1)) {
     const [A, B, C, D] = helper(a, b);
     return [BigInt(A), BigInt(B), BigInt(C), BigInt(D), 0n, 0n];
   }
@@ -175,7 +184,8 @@ function halfgcd(a, b, useSubquadraticMethod) {
     if (n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
       return [A, B, C, D, a, b];
     }
-    const m1 = n < 1024 ? Math.max(n - LOG2MAX * 2, 0) : Math.floor(n / 2); // 512 is a good choise, seems
+    const isSmall = n < 1024;
+    const m1 = isSmall ? Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)) : Math.floor(n / 2);
     const m = BigInt(m1);
     if (step !== 1/* && m1 < size / 2*/) {//?
       if (((a + A) >> m) !== ((a + B) >> m) ||
@@ -183,7 +193,7 @@ function halfgcd(a, b, useSubquadraticMethod) {
         return [A, B, C, D, a, b];
       }
     }
-    const [A1, B1, C1, D1, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, n >= 1024);
+    const [A1, B1, C1, D1, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, isSmall);
     if (step === 1) {
       [A, B, C, D] = [A1, B1, C1, D1];
     } else {
@@ -191,7 +201,7 @@ function halfgcd(a, b, useSubquadraticMethod) {
       [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D,
                       C1 * A + D1 * C, C1 * B + D1 * D];
     }
-    if (n - m1 <= LOG2MAX * 2) {
+    if (isSmall) {
       [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T1 * (a, b)
     } else {
       const alo = BigInt.asUintN(m1, a);
@@ -319,19 +329,6 @@ function bigIntGCD(a, b) {
   }
   a = abs(BigInt(a));
   b = abs(BigInt(b));
-  if (nb >= 1/0) {
-    var size = Math.min(bitLength(a), bitLength(b));
-    size = Math.pow(2, bitLength(size));
-    if (size >= 64 * 1024) {
-      if (size > lastMaxSize) {
-        lastMaxSize = size;
-        var error = new TypeError("big size of " + "gcd" + " " + size);
-        if (globalThis.onerror != null) {
-          globalThis.onerror(error.message, "", 0, 0, error);
-        }
-      }
-    }
-  }
   if (nb > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
     const c1 = ctz(a);
     const c2 = ctz(b);
