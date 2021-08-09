@@ -157,6 +157,8 @@ function helper(xx, yy) {
   return [A, B, C, D];
 }
 
+const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
+
 function halfgcd(a, b, small) {
   //console.assert(a >= b && b >= 0n);
 
@@ -167,11 +169,12 @@ function halfgcd(a, b, small) {
   // ([A, B], [C, D]) * (a + x, b + y) = (A*(a+x)+B*(b+y), C*(a+x)+D*(b+y)) = (A*a+B*b, C*a+D*b) + (A*x+B*y, C*x+D*y)
   //Note: for debugging it is useful to compare quotients in simple Euclidean algorithms vs quotients here
 
-  if (small || Number(a) < Math.pow(Number.MAX_SAFE_INTEGER + 1, doubleDigitMethod ? 2 : 1)) {
+  if (small) {
     const [A, B, C, D] = helper(a, b);
     return [BigInt(A), BigInt(B), BigInt(C), BigInt(D), 0n, 0n];
   }
   const size = bitLength(a);
+  const isSmall = size <= SUBQUADRATIC_HALFGCD_THRESHOLD;
   let [A, B, C, D] = [1n, 0n, 0n, 1n]; // 2x2 matrix
   let step = 0;
   while (true) { // Q(T, a + 1n, b) === Q(T, a, b + 1n)
@@ -182,13 +185,11 @@ function halfgcd(a, b, small) {
     // A*(X+Y) = A*X+A*Y
     //const [a1, b1] = [a + A, b + C]; // T * (a_initial + 1n, b_initial);
     //const [a2, b2] = [a + B, b + D]; // T * (a_initial, b_initial + 1n);
-    const n = step === 1 ? size : bitLength(a);
-    if (n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
-      return [A, B, C, D, a, b];
-    }
-    const isSmall = n < 1024;
-    const m1 = isSmall ? Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)) : Math.floor(n / 2);
-    const m = BigInt(m1);
+    const n = step === 1 ? size : (isSmall ? bitLength2(a) : bitLength(a));
+    //if (!isSmall && n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
+    //  return [A, B, C, D, a, b];
+    //}
+    const m = BigInt(isSmall ? Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)) : n - Math.floor(size / 2));
     if (step !== 1/* && m1 < size / 2*/) {//?
       if (((a + A) >> m) !== ((a + B) >> m) ||
           ((b + C) >> m) !== ((b + D) >> m)) {
@@ -206,8 +207,8 @@ function halfgcd(a, b, small) {
     if (isSmall) {
       [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T1 * (a, b)
     } else {
-      const alo = BigInt.asUintN(m1, a);
-      const blo = BigInt.asUintN(m1, b);
+      const alo = BigInt.asUintN(Number(m), a);
+      const blo = BigInt.asUintN(Number(m), b);
       [a, b] = [(A1 * alo + B1 * blo) + (transformedAhi << m), (C1 * alo + D1 * blo) + (transformedBhi << m)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
     }
     console.assert(a > 0n && b >= 0n);
@@ -216,8 +217,8 @@ function halfgcd(a, b, small) {
       if (b !== 0n) {//TODO: ?
         const q = a / b;
         const C2 = A - q * C, D2 = B - q * D, b1 = a - q * b;
-        const sameQuotient = b1 + C2 >= 0 && b1 + C2 < b + C &&
-                             b1 + D2 >= 0 && b1 + D2 < b + D;
+        const sameQuotient = b1 + C2 >= 0n && b1 + C2 < b + C &&
+                             b1 + D2 >= 0n && b1 + D2 < b + D;
         if (!sameQuotient) {
           return [A, B, C, D, a, b];
         }
