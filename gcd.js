@@ -1,4 +1,6 @@
 
+const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+
 //TODO: https://en.wikipedia.org/wiki/Euclidean_algorithm#Method_of_least_absolute_remainders
 function numbersGCD(a, b) {
   while (b > 0) {
@@ -11,20 +13,18 @@ function numbersGCD(a, b) {
 }
 
 function EuclidsGCD(a, b) {
-  while (Number(b) > Number.MAX_SAFE_INTEGER) {
+  while (b > MAX_SAFE_INTEGER) {
     const r = a % b;
     a = b;
     b = r;
   }
-  let nb = Number(b);
-  if (nb > 0) {
-    let na = Number(a);
-    if (na > Number.MAX_SAFE_INTEGER) {
-      const r = Number(a % BigInt(nb));
-      na = nb;
-      nb = r;
+  if (b > 0n) {
+    if (a > MAX_SAFE_INTEGER) {
+      const r = a % b;
+      a = b;
+      b = r;
     }
-    return numbersGCD(na, nb);
+    return numbersGCD(Number(a), Number(b));
   }
   return a;
 }
@@ -154,10 +154,15 @@ function helper(xx, yy) {
     }
 
   }
-  return [A, B, C, D];
+  return [BigInt(A), BigInt(B), BigInt(C), BigInt(D)];
 }
 
 const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
+
+function matrixMultiply(A1, B1, C1, D1, A, B, C, D) {
+  return [A1 * A + B1 * C, A1 * B + B1 * D,
+          C1 * A + D1 * C, C1 * B + D1 * D];
+}
 
 function halfgcd(a, b, small) {
   //console.assert(a >= b && b >= 0n);
@@ -171,7 +176,7 @@ function halfgcd(a, b, small) {
 
   if (small) {
     const [A, B, C, D] = helper(a, b);
-    return [BigInt(A), BigInt(B), BigInt(C), BigInt(D), 0n, 0n];
+    return [A, B, C, D, 0n, 0n];
   }
   const size = bitLength(a);
   const isSmall = size <= SUBQUADRATIC_HALFGCD_THRESHOLD;
@@ -201,8 +206,7 @@ function halfgcd(a, b, small) {
       [A, B, C, D] = [A1, B1, C1, D1];
     } else {
       // T = T1 * T:
-      [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D,
-                      C1 * A + D1 * C, C1 * B + D1 * D];
+      [A, B, C, D] = matrixMultiply(A1, B1, C1, D1, A, B, C, D)
     }
     if (isSmall) {
       [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T1 * (a, b)
@@ -235,6 +239,7 @@ function halfgcd(a, b, small) {
 }
 
 const SUBQUADRATIC_GCD_THRESHOLD = (32 * 1024);
+const LEHMERS_ALGORITHM_THRESHOLD = BigInt(2**68);
 
 let lastMaxSize = -1;
 
@@ -249,71 +254,64 @@ function LehmersGCD(a, b) {
   }
 
   // Subquadratic Lehmer's algorithm:
-  while (Number(b) >= 1/0 && BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b) {
+  while (BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b) {
     //console.assert(a >= b);
-    const n = bitLength2(a);
-    const m = Math.floor(n / 2);
-    const m1 = BigInt(m);
-    const [A, B, C, D, transformedAhi, transformedBhi] = halfgcd(a >> m1, b >> m1, false);
-    if (B === 0n) {
-      //console.assert(A === 1n && B === 0n && C === 0n && D === 1n);
+    const n = bitLength(a);
+    const m = BigInt(Math.floor(n / 2));
+    const [A1, B1, C1, D1, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, false);
+    if (B1 === 0n) {
+      //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       //gcd.debug(a / b);
-      const r = a % b;
-      a = b;
-      b = r;
+      [a, b] = [b, a % b];
     } else {
-      const alo = BigInt.asUintN(m, a);
-      const blo = BigInt.asUintN(m, b);
-      [a, b] = [(A * alo + B * blo) + (transformedAhi << m1), (C * alo + D * blo) + (transformedBhi << m1)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
+      const alo = BigInt.asUintN(Number(m), a);
+      const blo = BigInt.asUintN(Number(m), b);
+      [a, b] = [(A1 * alo + B1 * blo) + (transformedAhi << m), (C1 * alo + D1 * blo) + (transformedBhi << m)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
     }
   }
 
   // Lehmer's algorithm:
-  while (Number(b) >= Math.sqrt(Math.pow(Number.MAX_SAFE_INTEGER + 1, 3))) {
+  while (b >= LEHMERS_ALGORITHM_THRESHOLD) {
     //console.assert(a >= b);
     const n = bitLength2(a);
-    const m = Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1));
-    const [A, B, C, D] = helper(a >> BigInt(m), b >> BigInt(m));
-    if (B === 0) {
-      //console.assert(A === 1 && B === 0 && C === 0 && D === 1);
+    const m = BigInt(Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)));
+    const [A1, B1, C1, D1] = helper(a >> m, b >> m);
+    if (B1 === 0n) {
+      //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       //gcd.debug(a / b);
-      const r = a % b;
-      a = b;
-      b = r;
+      [a, b] = [b, a % b];
     } else {
-      [a, b] = [BigInt(A) * a + BigInt(B) * b, BigInt(C) * a + BigInt(D) * b]; // T * (a, b)
+      [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T * (a, b)
     }
   }
 
-  return EuclidsGCD(a, b);
+  return EuclidsGCD(a, b)
 }
+
 
 function abs(a) {
   return a < 0n ? -a : a;
 }
 
 function ctz(a) {
-  // https://en.wikipedia.org/wiki/Find_first_set#Properties_and_relations
-  //return bitLength(a & (-a)) - 1;
-  const s = a.toString(16);
-  let n = s.length - 1;
-  while (s.charCodeAt(n) === '0'.charCodeAt(0)) {
-    n -= 1;
+  var k = 32;
+  while (BigInt.asUintN(k, a) === 0n) {
+    k *= 2;
   }
-  let x = s.charCodeAt(n);
-  if (x < 'a'.charCodeAt(0)) {
-    x -= '0'.charCodeAt(0);
-  } else {
-    x -= 'a'.charCodeAt(0);
-    x += 10;
+  var n = 0;
+  for (var i = Math.floor(k / 2); i >= 32; i = Math.floor(i / 2)) {
+    if (BigInt.asUintN(i, a) === 0n) {
+      n += i;
+      a >>= BigInt(i);
+    } else {
+      a = BigInt.asUintN(i, a);
+    }
   }
-  //let e = (31 - Math.clz32(x & -x));
-  let e = 0;
-  while (x % 2 === 0) {
-    x /= 2;
-    e += 1;
+  function numberCTZ(a) {
+    return 32 - (Math.clz32(a & -a) + 1);
   }
-  return (s.length - 1 - n) * 4 + e;
+  n += numberCTZ(Number(BigInt.asUintN(32, a)));
+  return n;
 }
 
 function bigIntGCD(a, b) {
@@ -342,9 +340,9 @@ function bigIntGCD(a, b) {
   a = abs(BigInt(a));
   b = abs(BigInt(b));
   if (nb > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
-    const c1 = ctz(a);
-    const c2 = ctz(b);
-    if (c1 > 4 || c2 > 4) {
+    if (BigInt.asUintN(4, a) === 0n || BigInt.asUintN(4, b) === 0n) {
+      const c1 = ctz(a);
+      const c2 = ctz(b);
       const g = LehmersGCD(c1 === 0 ? a : a >> BigInt(c1), c2 === 0 ? b : b >> BigInt(c2));
       const c = Math.min(c1, c2);
       return c === 0 ? g : (BigInt(g) << BigInt(c));
