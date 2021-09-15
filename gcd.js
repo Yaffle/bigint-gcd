@@ -293,7 +293,14 @@ function abs(a) {
   return a < 0n ? -a : a;
 }
 
+function numberCTZ(a) {
+  return 32 - (Math.clz32(a & -a) + 1);
+}
 function ctz(a) {
+  var test = BigInt.asUintN(32, a);
+  if (test !== 0n) {
+    return numberCTZ(Number(test));
+  }
   var k = 32;
   while (BigInt.asUintN(k, a) === 0n) {
     k *= 2;
@@ -306,9 +313,6 @@ function ctz(a) {
     } else {
       a = BigInt.asUintN(i, a);
     }
-  }
-  function numberCTZ(a) {
-    return 32 - (Math.clz32(a & -a) + 1);
   }
   n += numberCTZ(Number(BigInt.asUintN(32, a)));
   return n;
@@ -340,9 +344,9 @@ function bigIntGCD(a, b) {
   a = abs(BigInt(a));
   b = abs(BigInt(b));
   if (nb > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
-    if (BigInt.asUintN(4, a) === 0n || BigInt.asUintN(4, b) === 0n) {
-      const c1 = ctz(a);
-      const c2 = ctz(b);
+    const c1 = ctz(a);
+    const c2 = ctz(b);
+    if (c1 + c2 >= 4) {
       const g = LehmersGCD(c1 === 0 ? a : a >> BigInt(c1), c2 === 0 ? b : b >> BigInt(c2));
       const c = Math.min(c1, c2);
       return c === 0 ? g : (BigInt(g) << BigInt(c));
