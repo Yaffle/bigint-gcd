@@ -12,6 +12,23 @@ function numbersGCD(a, b) {
   return a;
 }
 
+// https://webassembly.studio
+let i64gcd = null;
+const url = 'data:application/wasm;base64,AGFzbQEAAAABBwFgAn5+AX4DAgEABQMBAAAHEAIDZ2NkAAAGbWVtb3J5AgAKJAEiAQF+A0AgAUIAUgRAIAAgAYIhAiABIQAgAiEBDAELCyAACw';
+if (typeof WebAssembly !== "undefined" && WebAssembly.instantiateStreaming != null) {
+  WebAssembly.instantiateStreaming(fetch(url)).then(result => {
+    const f = result.instance.exports.gcd;
+    // https://github.com/GoogleChromeLabs/wasm-feature-detect/blob/master/src/detectors/big-int/index.js
+    try {
+      if (f(BigInt(0), BigInt(0)) === BigInt(0)) {
+        i64gcd = f;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  });
+}
+
 function EuclidsGCD(a, b) {
   while (b > MAX_SAFE_INTEGER) {
     const r = a % b;
@@ -343,6 +360,9 @@ function bigIntGCD(a, b) {
   }
   a = abs(BigInt(a));
   b = abs(BigInt(b));
+  if (i64gcd != null && na < 2**64) {
+    return BigInt.asUintN(64, i64gcd(a, b));
+  }
   if (nb > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
     const c1 = ctz(a);
     const c2 = ctz(b);
