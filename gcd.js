@@ -1,3 +1,4 @@
+/*jshint esversion:11*/
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 
@@ -16,7 +17,7 @@ function numbersGCD(a, b) {
 let i64gcd = null;
 const url = 'data:application/wasm;base64,AGFzbQEAAAABBwFgAn5+AX4DAgEABQMBAAAHEAIDZ2NkAAAGbWVtb3J5AgAKJAEiAQF+A0AgAUIAUgRAIAAgAYIhAiABIQAgAiEBDAELCyAACw';
 if (typeof WebAssembly !== "undefined" && WebAssembly.instantiateStreaming != null) {
-  WebAssembly.instantiateStreaming(fetch(url)).then(result => {
+  WebAssembly.instantiateStreaming(fetch(url)).then(function (result) {
     const f = result.instance.exports.gcd;
     // https://github.com/GoogleChromeLabs/wasm-feature-detect/blob/master/src/detectors/big-int/index.js
     try {
@@ -51,7 +52,7 @@ function EuclidsGCD(a, b) {
 // floor(log2(a)) + 1 if a > 0
 function bitLength(a) {
   const s = a.toString(16);
-  const c = s.charCodeAt(0) - '0'.charCodeAt(0);
+  const c = s.charCodeAt(0) - 0 - '0'.charCodeAt(0);
   if (c <= 0) {
     throw new RangeError();
   }
@@ -79,7 +80,7 @@ function bitLength2(a) {
     return previousValue;
   }
   if (previousValue <= 1024) {
-    let n = Number(a);
+    let n = Number(BigInt(a));
     let x = Math.log2(n) + 1024 * 4 - 1024 * 4;
     let y = Math.ceil(x);
     if (x !== y) {
@@ -99,12 +100,12 @@ function bitLength2(a) {
 const p53 = BigInt(LOG2MAX);
 function significand(value, doubleDigit) {
   if (!doubleDigit) {
-    return [Number(value), 0];
+    return [Number(BigInt(value)), 0];
   }
-  const lo = Number(BigInt.asUintN(LOG2MAX, value));
+  const lo = Number(BigInt(BigInt.asUintN(LOG2MAX, value)));
   //const hi = Number(value >> p53);
   // Instead doing something to save one BigInt operation:
-  const tmp = Number(value);  
+  const tmp = Number(BigInt(value));
   let hi = Math.floor(tmp / (Number.MAX_SAFE_INTEGER + 1));
   if (Math.floor(tmp - (Number.MAX_SAFE_INTEGER + 1) * hi) === 0) {
     if (lo > (Number.MAX_SAFE_INTEGER + 1) / 2) {
@@ -140,12 +141,12 @@ function helper(xx, yy) {
   let A = 1, B = 0, C = 0, D = 1; // 2x2-matrix transformation matrix of (x_initial, y_initial) into (x, y)
 
   let lobits = LOG2MAX;
-  for (let i = doubleDigitMethod ? 0 : 3; i < 4; i++) {
+  for (let i = doubleDigitMethod ? 0 : 3; i < 4; i += 1) {
 
     let sameQuotient = y !== 0;
     while (sameQuotient) {
       //console.assert(y >= 0);
-      const q = Math.floor(x / y);
+      const q = Math.floor(+x / y);
       const C1 = A - q * C, D1 = B - q * D, y1 = x - q * y;
       sameQuotient = y1 + C1 >= 0 && y1 + C1 < y + C &&
                      y1 + D1 >= 0 && y1 + D1 < y + D;
@@ -218,12 +219,20 @@ function halfgcd(a, b, small) {
         return [A, B, C, D, a, b];
       }
     }
-    const [A1, B1, C1, D1, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, isSmall);
+    const [M0, M1, M2, M3, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, isSmall);
+    const A1 = BigInt(M0);
+    const B1 = BigInt(M1);
+    const C1 = BigInt(M2);
+    const D1 = BigInt(M3);
     if (step === 1) {
       [A, B, C, D] = [A1, B1, C1, D1];
     } else {
       // T = T1 * T:
-      [A, B, C, D] = matrixMultiply(A1, B1, C1, D1, A, B, C, D)
+      const [M4, M5, M6, M7] = matrixMultiply(A1, B1, C1, D1, A, B, C, D);
+      A = BigInt(M4);
+      B = BigInt(M5);
+      C = BigInt(M6);
+      D = BigInt(M7);
     }
     if (isSmall) {
       [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T1 * (a, b)
@@ -236,7 +245,7 @@ function halfgcd(a, b, small) {
     if (B1 === 0n) {
       console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       if (b !== 0n) {//TODO: ?
-        const q = a / b;
+        const q = BigInt(a) / b;
         const C2 = A - q * C, D2 = B - q * D, b1 = a - q * b;
         const sameQuotient = b1 + C2 >= 0n && b1 + C2 < b + C &&
                              b1 + D2 >= 0n && b1 + D2 < b + D;
@@ -257,8 +266,6 @@ function halfgcd(a, b, small) {
 
 const SUBQUADRATIC_GCD_THRESHOLD = (32 * 1024);
 const LEHMERS_ALGORITHM_THRESHOLD = BigInt(2**68);
-
-let lastMaxSize = -1;
 
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
@@ -302,7 +309,7 @@ function LehmersGCD(a, b) {
     }
   }
 
-  return EuclidsGCD(a, b)
+  return EuclidsGCD(a, b);
 }
 
 
@@ -314,16 +321,16 @@ function numberCTZ(a) {
   return 32 - (Math.clz32(a & -a) + 1);
 }
 function ctz(a) {
-  var test = BigInt.asUintN(32, a);
+  const test = BigInt.asUintN(32, a);
   if (test !== 0n) {
     return numberCTZ(Number(test));
   }
-  var k = 32;
+  let k = 32;
   while (BigInt.asUintN(k, a) === 0n) {
     k *= 2;
   }
-  var n = 0;
-  for (var i = Math.floor(k / 2); i >= 32; i = Math.floor(i / 2)) {
+  let n = 0;
+  for (let i = Math.floor(k / 2); i >= 32; i = Math.floor(i / 2)) {
     if (BigInt.asUintN(i, a) === 0n) {
       n += i;
       a >>= BigInt(i);
@@ -331,48 +338,41 @@ function ctz(a) {
       a = BigInt.asUintN(i, a);
     }
   }
-  n += numberCTZ(Number(BigInt.asUintN(32, a)));
+  n += numberCTZ(Number(BigInt(BigInt.asUintN(32, a))));
   return n;
 }
 
 function bigIntGCD(a, b) {
-  let na = Math.abs(Number(a));
-  let nb = Math.abs(Number(b));
-  if (na < nb) {
-    const tmp = a;
-    a = b;
-    b = tmp;
-    const tmp1 = na;
-    na = nb;
-    nb = tmp1;
+  const A = abs(BigInt(a));
+  const B = abs(BigInt(b));
+  const na = Number(A);
+  const nb = Number(B);
+  if (Math.max(na, nb) <= Number.MAX_SAFE_INTEGER) {
+    return BigInt(numbersGCD(na, nb));
   }
-  if (na <= Number.MAX_SAFE_INTEGER) {
-    return numbersGCD(na, nb);
-  }
-  if (nb <= Number.MAX_SAFE_INTEGER) {
-    if (nb === 0) {
-      return abs(BigInt(a));
+  const abmin = Math.min(na, nb);
+  if (abmin <= Number.MAX_SAFE_INTEGER) {
+    if (abmin === 0) {
+      return A + B;
     }
-    if (nb === 1) {
-      return 1;
+    if (abmin === 1) {
+      return 1n;
     }
-    return numbersGCD(nb, Math.abs(Number(BigInt(a) % BigInt(b))));
+    return BigInt(numbersGCD(abmin, Math.abs(Number(na < nb ? B % A : A % B))));
   }
-  a = abs(BigInt(a));
-  b = abs(BigInt(b));
-  if (i64gcd != null && na < 2**64) {
-    return BigInt.asUintN(64, i64gcd(a, b));
+  if (i64gcd != null && Math.max(na, nb) < 2**64) {
+    return BigInt.asUintN(64, i64gcd(A, B));
   }
-  if (nb > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
-    const c1 = ctz(a);
-    const c2 = ctz(b);
+  if (abmin > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
+    const c1 = ctz(A);
+    const c2 = ctz(B);
     if (c1 + c2 >= 4) {
-      const g = LehmersGCD(c1 === 0 ? a : a >> BigInt(c1), c2 === 0 ? b : b >> BigInt(c2));
+      const g = LehmersGCD(c1 === 0 ? A : A >> BigInt(c1), c2 === 0 ? B : B >> BigInt(c2));
       const c = Math.min(c1, c2);
       return c === 0 ? g : (BigInt(g) << BigInt(c));
     }
   }
-  return LehmersGCD(a, b);
+  return LehmersGCD(A, B);
 }
 
 export default bigIntGCD;
