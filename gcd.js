@@ -131,29 +131,48 @@ function exp2(n) {
 
 const doubleDigitMethod = true;
 
-function helper(xx, yy) {
-  let [x, xlo] = significand(xx, doubleDigitMethod);
-  let [y, ylo] = significand(yy, doubleDigitMethod);
+function helper(X, Y) {
+  let [x, xlo] = significand(X, doubleDigitMethod);
+  let [y, ylo] = significand(Y, doubleDigitMethod);
 
   // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q}} matrices,
   // where q is the quotient produced by Euclid's algorithm for any pair of integers (a, b),
-  // where a within [xx; xx + 1) and b within [yy; yy + 1)
-  let A = 1, B = 0, C = 0, D = 1; // 2x2-matrix transformation matrix of (x_initial, y_initial) into (x, y)
+  // where a within [X << m; ((X + 1) << m) - 1] and b within [Y << m; ((Y + 1) << m) - 1]
+
+  // 2x2-matrix transformation matrix of (x_initial, y_initial) into (x, y):
+  let A = 1;
+  let B = 0;
+  let C = 0;
+  let D = 1;
 
   let lobits = LOG2MAX;
   for (let i = doubleDigitMethod ? 0 : 3; i < 4; i += 1) {
 
     let sameQuotient = y !== 0;
     while (sameQuotient) {
-      //console.assert(y >= 0);
+      //console.assert(y > 0);
       const q = Math.floor(+x / y);
-      const C1 = A - q * C, D1 = B - q * D, y1 = x - q * y;
-      sameQuotient = y1 + C1 >= 0 && y1 + C1 < y + C &&
-                     y1 + D1 >= 0 && y1 + D1 < y + D;
-      if (sameQuotient) { // Quotient(T.transformPoint(x_initial + 1, y_initial)) === Quotient(T.transformPoint(x_initial, y_initial + 1))
-        // Multiply matrix agumented by column (x, y) by {{0, 1}, {1, -q}} from the right:
-        A = C; B = D; x = y;
-        C = C1; D = D1; y = y1;
+      const y1 = x - q * y;
+      // Multiply matrix augmented by column (x, y) by {{0, 1}, {1, -q}} from the right:
+      const A1 = C;
+      const B1 = D;
+      const C1 = A - q * C;
+      const D1 = B - q * D;
+      // The quotient for a point (x_initial + alpha, y_initial + beta), where 0 <= alpha < 1 and 0 <= beta < 1:
+      // floor((x + A * alpha + B * beta) / (y + C * alpha + D * beta))
+      // As the sign(A) === -sign(B) === -sign(C) === sign(D) (ignoring zero entries) the maximum and minimum values are floor((x + A) / (y + C)) and floor((x + B) / (y + D))
+
+      // floor((x + A) / (y + C)) === q  <=>  0 <= (x + A) - q * (y + C) < (y + C)  <=>  0 <= y1 + C1 < y + C
+      // floor((x + B) / (y + D)) === q  <=>  0 <= (x + B) - q * (y + D) < (y + D)  <=>  0 <= y1 + D1 < y + D
+      sameQuotient = 0 <= y1 + C1 && y1 + C1 < y + C &&
+                     0 <= y1 + D1 && y1 + D1 < y + D;
+      if (sameQuotient) {
+        x = y;
+        y = y1;
+        A = A1;
+        B = B1;
+        C = C1;
+        D = D1;
         //gcd.debug(q);
       }
     }
