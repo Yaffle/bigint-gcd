@@ -120,6 +120,9 @@ function significand(value, doubleDigit) {
 
 // 2**n
 function exp2(n) {
+  if (n < 0) {
+    throw new RangeError();
+  }
   let result = 1;
   while (n > 30) {
     n -= 30;
@@ -178,7 +181,7 @@ function helper(X, Y) {
     }
 
     if (i < 3) {
-      const bits = Math.min(LOG2MAX - 1 - log2(Math.max(x, y)), lobits); // assuming that max(x, y) > max(abs(A), abs(B), abs(C), abs(D))
+      const bits = Math.min(Math.max(LOG2MAX - 1 - log2(Math.max(x, y)), 0), lobits); // assuming that max(x, y) > max(abs(A), abs(B), abs(C), abs(D))
       const d = exp2(lobits - bits);
       const xlo1 = Math.floor(xlo / d);
       const ylo1 = Math.floor(ylo / d);
