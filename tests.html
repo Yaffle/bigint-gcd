@@ -1,0 +1,12 @@
+<script type="module">
+
+import gcd from './gcd.js';
+
+setTimeout(() => {
+  const a = (1n << 200n) + 1n;
+  const b = (1n << 100n) + 1n;
+  const g = gcd(a, b);
+  console.assert(g.toString() === '1', g.toString());
+}, 100);
+
+</script>

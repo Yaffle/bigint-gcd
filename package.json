@@ -1,8 +1,9 @@
 {
   "name": "bigint-gcd",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "greater common divisor (gcd) of two BigInt values using Lehmer's GCD algorithm",
   "main": "gcd.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

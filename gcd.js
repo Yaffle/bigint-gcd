@@ -21,7 +21,7 @@ if (typeof WebAssembly !== "undefined" && WebAssembly.instantiateStreaming != nu
     const f = result.instance.exports.gcd;
     // https://github.com/GoogleChromeLabs/wasm-feature-detect/blob/master/src/detectors/big-int/index.js
     try {
-      if (f(BigInt(0), BigInt(0)) === BigInt(0)) {
+      if (f(0n, 0n) === 0n) {
         i64gcd = f;
       }
     } catch (error) {
@@ -81,7 +81,7 @@ if (typeof WebAssembly !== "undefined" && WebAssembly.instantiateStreaming != nu
     const f = result.instance.exports.helper;
     // https://github.com/GoogleChromeLabs/wasm-feature-detect/blob/master/src/detectors/big-int/index.js
     try {
-      const [A, B, C, D] = f(BigInt(1), BigInt(0), BigInt(1), BigInt(0), BigInt(0));
+      const [A, B, C, D] = f(1n, 0n, 1n, 0n, 0n);
       if (A === 1n && B === 0n && C === 0n && D === 1n) {
         wasmHelper = f;
         DIGITSIZE = 63;
@@ -166,6 +166,9 @@ function helper(X, Y) {
     const xlo = BigInt.asUintN(DIGITSIZE, X);
     const y = Y >> DIGITSIZE_BIG;
     const ylo = BigInt.asUintN(DIGITSIZE, Y);
+    if (y === 0n) {
+      return [1n, 0n, 0n, 1n];
+    }
     return wasmHelper(x, xlo, y, ylo, DIGITSIZE_BIG);
   }
 
