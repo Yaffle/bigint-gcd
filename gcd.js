@@ -153,7 +153,7 @@ function helper(X, Y) {
   let D = 1;
 
   let lobits = LOG2MAX;
-  for (let i = doubleDigitMethod ? 4 : 0; i >= 0; i -= 1) {
+  for (let i = doubleDigitMethod ? 3 : 0; i >= 0; i -= 1) {
 
     let sameQuotient = y !== 0;
     while (sameQuotient) {
