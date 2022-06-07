@@ -71,7 +71,27 @@ function log2(x) {
 }
 
 const LOG2MAX = Math.floor(Math.log2(Number.MAX_SAFE_INTEGER + 1));
-const DIGITSIZE = LOG2MAX;
+let DIGITSIZE = LOG2MAX;
+let DIGITSIZE_BIG = BigInt(DIGITSIZE);
+
+let wasmHelper = null;
+const url2 = 'data:application/wasm;base64,AGFzbQEAAAABDQFgBX5+fn5+BH5+fn4DAgEABwoBBmhlbHBlcgAACsYCAcMCBQR+AX8GfgF/A35CASEFQgAhBkIAIQdCASEIQQQhCQNAIAUhDCAGIQ0gByEOIAghDyACIQsgACECA0AgAiEAIAshAiAMIQUgDSEGIA4hByAPIQggACACfyEKIAAgAoEhCyAHIQwgCCENIAUgCiAHfn0hDiAGIAogCH59IQ9CACALIA58VyALIA58IAIgB3xTcUIAIAsgD3xXIAsgD3wgAiAIfFNxcSEQIBBBAEcNAAsgACACIAAgAlUbeSERIBFCAn0hESARQgAgEUIAVRshESAEIBEgESAEVRshESAEIBF9IQQgASAEhyESIAMgBIchEyABIBIgBIZ9IQEgAyATIASGfSEDIAUgEn4gBiATfnwgACARhnwhACAHIBJ+IAggE358IAIgEYZ8IQIgCUEBayEJIAlBAEcNAAsgBSAGIAcgCAsAaARuYW1lAmEBABQAAXgBA3hsbwIBeQMDeWxvBAZsb2JpdHMFAUEGAUIHAUMIAUQJAWkKAXELAnkxDAJBMQ0CQjEOAkMxDwJEMRAMc2FtZVF1b3RpZW50EQRiaXRzEgR4bG8xEwR5bG8x';
+if (typeof WebAssembly !== "undefined" && WebAssembly.instantiateStreaming != null) {
+  WebAssembly.instantiateStreaming(fetch(url2)).then(function (result) {
+    const f = result.instance.exports.helper;
+    // https://github.com/GoogleChromeLabs/wasm-feature-detect/blob/master/src/detectors/big-int/index.js
+    try {
+      const [A, B, C, D] = f(BigInt(1), BigInt(0), BigInt(1), BigInt(0), BigInt(0));
+      if (A === 1n && B === 0n && C === 0n && D === 1n) {
+        wasmHelper = f;
+        DIGITSIZE = 63;
+        DIGITSIZE_BIG = 63n;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  });
+}
 
 let previousValue = -1;
 // some terrible optimization as bitLength is slow
@@ -138,7 +158,17 @@ function exp2(n) {
 
 const doubleDigitMethod = true;
 
+
+
 function helper(X, Y) {
+  if (wasmHelper != null) {
+    const x = X >> DIGITSIZE_BIG;
+    const xlo = BigInt.asUintN(DIGITSIZE, X);
+    const y = Y >> DIGITSIZE_BIG;
+    const ylo = BigInt.asUintN(DIGITSIZE, Y);
+    return wasmHelper(x, xlo, y, ylo, DIGITSIZE_BIG);
+  }
+
   let [x, xlo] = significand(X, doubleDigitMethod);
   let [y, ylo] = significand(Y, doubleDigitMethod);
 
