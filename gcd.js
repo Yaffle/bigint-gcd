@@ -71,6 +71,7 @@ function log2(x) {
 }
 
 const LOG2MAX = Math.floor(Math.log2(Number.MAX_SAFE_INTEGER + 1));
+const DIGITSIZE = LOG2MAX;
 
 let previousValue = -1;
 // some terrible optimization as bitLength is slow
@@ -88,24 +89,27 @@ function bitLength2(a) {
       return y;
     }
   }
-  let n = Number(a >> BigInt(previousValue - LOG2MAX));
+  let n = Number(a >> BigInt(previousValue - DIGITSIZE));
   if (n < 1 || n >= (Number.MAX_SAFE_INTEGER + 1)) {
     previousValue = -1;
     return bitLength2(a);
   }
-  previousValue = previousValue - LOG2MAX + log2(n);
+  previousValue = previousValue - DIGITSIZE + log2(n);
   return previousValue;
 }
 
 const p53 = BigInt(LOG2MAX);
 function significand(value, doubleDigit) {
   if (!doubleDigit) {
-    return [Number(BigInt(value)), 0];
+    return [Number(value), 0];
   }
-  const lo = Number(BigInt(BigInt.asUintN(LOG2MAX, value)));
+  if (DIGITSIZE > LOG2MAX) {
+    throw new RangeError();
+  }
+  const lo = Number(BigInt.asUintN(LOG2MAX, value));
   //const hi = Number(value >> p53);
   // Instead doing something to save one BigInt operation:
-  const tmp = Number(BigInt(value));
+  const tmp = Number(value);
   let hi = Math.floor(tmp / (Number.MAX_SAFE_INTEGER + 1));
   if (Math.floor(tmp - (Number.MAX_SAFE_INTEGER + 1) * hi) === 0) {
     if (lo > (Number.MAX_SAFE_INTEGER + 1) / 2) {
@@ -234,7 +238,7 @@ function halfgcd(a, b, small) {
     //if (!isSmall && n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
     //  return [A, B, C, D, a, b];
     //}
-    const m = BigInt(isSmall ? Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)) : n - Math.floor(size / 2));
+    const m = BigInt(isSmall ? Math.max(0, n - DIGITSIZE * (doubleDigitMethod ? 2 : 1)) : n - Math.floor(size / 2));
     if (step !== 1/* && m1 < size / 2*/) {//?
       if (((a + A) >> m) !== ((a + B) >> m) ||
           ((b + C) >> m) !== ((b + D) >> m)) {
@@ -320,7 +324,7 @@ function LehmersGCD(a, b) {
   while (b >= LEHMERS_ALGORITHM_THRESHOLD) {
     //console.assert(a >= b);
     const n = bitLength2(a);
-    const m = BigInt(Math.max(0, n - LOG2MAX * (doubleDigitMethod ? 2 : 1)));
+    const m = BigInt(Math.max(0, n - DIGITSIZE * (doubleDigitMethod ? 2 : 1)));
     const [A1, B1, C1, D1] = helper(a >> m, b >> m);
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
