@@ -12,6 +12,8 @@
     (local $C1 i64)
     (local $D1 i64)
     (local $sameQuotient i32)
+    (local $xPlusMaxABclz i64)
+    (local $yPlusMaxCDclz i64)
     (local $bits i64)
     (local $xlo1 i64)
     (local $ylo1 i64)
@@ -45,19 +47,27 @@
         (local.set $sameQuotient
           (i32.and
             (i32.and
-              (i64.le_s (i64.const 0) (i64.add (local.get $y1) (local.get $C1)))
-              (i64.lt_s (i64.add (local.get $y1) (local.get $C1)) (i64.add (local.get $y) (local.get $C)))
+              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $C)) (local.get $C) (i64.lt_s (local.get $C) (i64.const 0)))) (i64.clz (local.get $q))) (i64.const 66))
+              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $D)) (local.get $D) (i64.lt_s (local.get $D) (i64.const 0)))) (i64.clz (local.get $q))) (i64.const 66))
             )
             (i32.and
-              (i64.le_s (i64.const 0) (i64.add (local.get $y1) (local.get $D1)))
-              (i64.lt_s (i64.add (local.get $y1) (local.get $D1)) (i64.add (local.get $y) (local.get $D)))
+              (i32.and
+                (i64.le_s (i64.const 0) (i64.add (local.get $y1) (local.get $C1)))
+                (i64.lt_s (i64.add (local.get $y1) (local.get $C1)) (i64.add (local.get $y) (local.get $C)))
+              )
+              (i32.and
+                (i64.le_s (i64.const 0) (i64.add (local.get $y1) (local.get $D1)))
+                (i64.lt_s (i64.add (local.get $y1) (local.get $D1)) (i64.add (local.get $y) (local.get $D)))
+              )
             )
           )
         )
         (br_if $loop2 (i32.ne (local.get $sameQuotient) (i32.const 0)))
       )
-      (local.set $bits (i64.clz (select (local.get $x) (local.get $y) (i64.gt_s (local.get $x) (local.get $y)))))
-      (local.set $bits (i64.sub (local.get $bits) (i64.const 2)))
+      (local.set $xPlusMaxABclz (i64.clz (i64.add (local.get $x) (select (local.get $A) (local.get $B) (i64.gt_s (local.get $A) (local.get $B))))))
+      (local.set $yPlusMaxCDclz (i64.clz (i64.add (local.get $y) (select (local.get $C) (local.get $D) (i64.gt_s (local.get $C) (local.get $D))))))
+      (local.set $bits (select (local.get $xPlusMaxABclz) (local.get $yPlusMaxCDclz) (i64.lt_s (local.get $xPlusMaxABclz) (local.get $yPlusMaxCDclz))))
+      (local.set $bits (i64.sub (local.get $bits) (i64.const 1)))
       (local.set $bits (select (local.get $bits) (i64.const 0) (i64.gt_s (local.get $bits) (i64.const 0))))
       (local.set $bits (select (local.get $lobits) (local.get $bits) (i64.gt_s (local.get $bits) (local.get $lobits))))
 

@@ -75,7 +75,8 @@ let DIGITSIZE = LOG2MAX;
 let DIGITSIZE_BIG = BigInt(DIGITSIZE);
 
 let wasmHelper = null;
-const url2 = 'data:application/wasm;base64,AGFzbQEAAAABDQFgBX5+fn5+BH5+fn4DAgEABwoBBmhlbHBlcgAACsYCAcMCBQR+AX8GfgF/A35CASEFQgAhBkIAIQdCASEIQQQhCQNAIAUhDCAGIQ0gByEOIAghDyACIQsgACECA0AgAiEAIAshAiAMIQUgDSEGIA4hByAPIQggACACfyEKIAAgAoEhCyAHIQwgCCENIAUgCiAHfn0hDiAGIAogCH59IQ9CACALIA58VyALIA58IAIgB3xTcUIAIAsgD3xXIAsgD3wgAiAIfFNxcSEQIBBBAEcNAAsgACACIAAgAlUbeSERIBFCAn0hESARQgAgEUIAVRshESAEIBEgESAEVRshESAEIBF9IQQgASAEhyESIAMgBIchEyABIBIgBIZ9IQEgAyATIASGfSEDIAUgEn4gBiATfnwgACARhnwhACAHIBJ+IAggE358IAIgEYZ8IQIgCUEBayEJIAlBAEcNAAsgBSAGIAcgCAsAaARuYW1lAmEBABQAAXgBA3hsbwIBeQMDeWxvBAZsb2JpdHMFAUEGAUIHAUMIAUQJAWkKAXELAnkxDAJBMQ0CQjEOAkMxDwJEMRAMc2FtZVF1b3RpZW50EQRiaXRzEgR4bG8xEwR5bG8x';
+
+const url2 = 'data:application/wasm;base64,AGFzbQEAAAABDQFgBX5+fn5+BH5+fn4DAgEABwoBBmhlbHBlcgAACpMDAZADBQR+AX8GfgF/BX5CASEFQgAhBkIAIQdCASEIQQQhCQNAIAUhDCAGIQ0gByEOIAghDyACIQsgACECA0AgAiEAIAshAiAMIQUgDSEGIA4hByAPIQggACACfyEKIAAgAoEhCyAHIQwgCCENIAUgCiAHfn0hDiAGIAogCH59IQ9CACAHfSAHIAdCAFMbeSAKeXxCwgBZQgAgCH0gCCAIQgBTG3kgCnl8QsIAWXFCACALIA58VyALIA58IAIgB3xTcUIAIAsgD3xXIAsgD3wgAiAIfFNxcXEhECAQQQBHDQALIAAgBSAGIAUgBlUbfHkhESACIAcgCCAHIAhVG3x5IRIgESASIBEgElMbIRMgE0IBfSETIBNCACATQgBVGyETIAQgEyATIARVGyETIAQgE30hBCABIASHIRQgAyAEhyEVIAEgFCAEhn0hASADIBUgBIZ9IQMgBSAUfiAGIBV+fCAAIBOGfCEAIAcgFH4gCCAVfnwgAiAThnwhAiAJQQFrIQkgCUEARw0ACyAFIAYgByAICwCGAQRuYW1lAn8BABYAAXgBA3hsbwIBeQMDeWxvBAZsb2JpdHMFAUEGAUIHAUMIAUQJAWkKAXELAnkxDAJBMQ0CQjEOAkMxDwJEMRAMc2FtZVF1b3RpZW50EQ14UGx1c01heEFCY2x6Eg15UGx1c01heENEY2x6EwRiaXRzFAR4bG8xFQR5bG8x';
 if (typeof WebAssembly !== "undefined" && WebAssembly.instantiateStreaming != null) {
   WebAssembly.instantiateStreaming(fetch(url2)).then(function (result) {
     const f = result.instance.exports.helper;
@@ -118,30 +119,6 @@ function bitLength2(a) {
   return previousValue;
 }
 
-const p53 = BigInt(LOG2MAX);
-function significand(value, doubleDigit) {
-  if (!doubleDigit) {
-    return [Number(value), 0];
-  }
-  if (DIGITSIZE > LOG2MAX) {
-    throw new RangeError();
-  }
-  const lo = Number(BigInt.asUintN(LOG2MAX, value));
-  //const hi = Number(value >> p53);
-  // Instead doing something to save one BigInt operation:
-  const tmp = Number(value);
-  let hi = Math.floor(tmp / (Number.MAX_SAFE_INTEGER + 1));
-  if (Math.floor(tmp - (Number.MAX_SAFE_INTEGER + 1) * hi) === 0) {
-    if (lo > (Number.MAX_SAFE_INTEGER + 1) / 2) {
-      hi -= 1;
-    }
-    if (lo === (Number.MAX_SAFE_INTEGER + 1) / 2) {
-      hi = Number(value >> p53);
-    }
-  }
-  return [hi, lo]; // 53 bits in hi, 53 bits in lo
-}
-
 // 2**n
 function exp2(n) {
   if (n < 0) {
@@ -158,22 +135,21 @@ function exp2(n) {
 
 const doubleDigitMethod = true;
 
-
-
 function helper(X, Y) {
+  const x = doubleDigitMethod ? X >> DIGITSIZE_BIG : X;
+  const xlo = doubleDigitMethod ? BigInt.asUintN(DIGITSIZE, X) : 0n;
+  const y = doubleDigitMethod ? Y >> DIGITSIZE_BIG : Y;
+  const ylo = doubleDigitMethod ? BigInt.asUintN(DIGITSIZE, Y) : 0n;
   if (wasmHelper != null) {
-    const x = X >> DIGITSIZE_BIG;
-    const xlo = BigInt.asUintN(DIGITSIZE, X);
-    const y = Y >> DIGITSIZE_BIG;
-    const ylo = BigInt.asUintN(DIGITSIZE, Y);
     if (y === 0n) {
       return [1n, 0n, 0n, 1n];
     }
     return wasmHelper(x, xlo, y, ylo, DIGITSIZE_BIG);
   }
+  return jsHelper(Number(x), Number(xlo), Number(y), Number(ylo));
+}
 
-  let [x, xlo] = significand(X, doubleDigitMethod);
-  let [y, ylo] = significand(Y, doubleDigitMethod);
+function jsHelper(x, xlo, y, ylo) {
 
   // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q}} matrices,
   // where q is the quotient produced by Euclid's algorithm for any pair of integers (a, b),
@@ -218,7 +194,7 @@ function helper(X, Y) {
     }
 
     if (i >= 1) {
-      const bits = Math.min(Math.max(LOG2MAX - 1 - log2(Math.max(x, y)), 0), lobits); // assuming that max(x, y) > max(abs(A), abs(B), abs(C), abs(D))
+      const bits = Math.min(Math.max(LOG2MAX - 0 - log2(Math.max(x + Math.max(A, B), y + Math.max(C, D))), 0), lobits);
       const d = exp2(lobits - bits);
       const xlo1 = Math.floor(xlo / d);
       const ylo1 = Math.floor(ylo / d);
