@@ -326,6 +326,9 @@ function LehmersGCD(a, b) {
       const alo = BigInt.asUintN(Number(m), a);
       const blo = BigInt.asUintN(Number(m), b);
       [a, b] = [(A1 * alo + B1 * blo) + (transformedAhi << m), (C1 * alo + D1 * blo) + (transformedBhi << m)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
+      if (a < 0n || b < 0n) {
+        throw new TypeError("assertion");
+      }
     }
   }
 
@@ -341,6 +344,9 @@ function LehmersGCD(a, b) {
       [a, b] = [b, a % b];
     } else {
       [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T * (a, b)
+      if (a < 0n || b < 0n) {
+        throw new TypeError("assertion");
+      }
     }
   }
 
