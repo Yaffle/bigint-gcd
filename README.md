@@ -54,6 +54,17 @@ Benchmark:
 ==========
 
 ```javascript
+import gcd from './gcd.js';
+
+function EuclideanGCD(a, b) {
+  while (b !== 0n) {
+    const r = a % b;
+    a = b;
+    b = r;
+  }
+  return a;
+}
+
 // Copy-paste the code from gcd.js .
 function FibonacciNumber(n) {
   console.assert(n > 0);
@@ -71,18 +82,19 @@ const b = FibonacciNumber(186n - 1n);
 const count = 100000;
 console.time();
 for (let i = 0; i < count; i++) {
-  if (LehmersGCD(a * BigInt(i), b * BigInt(i)) != i) {
+  if (gcd(a * BigInt(i), b * BigInt(i)) != i) {
     throw new Error();
   }
 }
 console.timeEnd();
-// Chrome 86: default: 850 ms
+// default: 549.77490234375 ms
 console.time();
 for (let i = 0; i < count; i++) {
-  if (EuclidsGCD(a * BigInt(i), b * BigInt(i)) != i) {
+  if (EuclideanGCD(a * BigInt(i), b * BigInt(i)) != i) {
     throw new Error();
   }
 }
 console.timeEnd();
-// Chrome 86: default: 1900 ms
+// default: 2974.14794921875 ms
+
 ```
