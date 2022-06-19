@@ -42,7 +42,7 @@ function EuclidsGCD(a, b) {
       a = b;
       b = r;
     }
-    return numbersGCD(Number(a), Number(b));
+    return BigInt(numbersGCD(Number(a), Number(b)));
   }
   return a;
 }

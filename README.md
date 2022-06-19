@@ -54,7 +54,7 @@ Benchmark:
 ==========
 
 ```javascript
-import gcd from './gcd.js';
+import {default as LehmersGCD} from './gcd.js';
 
 function EuclideanGCD(a, b) {
   while (b !== 0n) {
@@ -65,7 +65,35 @@ function EuclideanGCD(a, b) {
   return a;
 }
 
-// Copy-paste the code from gcd.js .
+function ctz4(n) {
+  return 31 - Math.clz32(n & -n);
+}
+const BigIntCache = new Array(32).fill(0n).map((x, i) => BigInt(i));
+function ctz1(bigint) {
+  return BigIntCache[ctz4(Number(BigInt.asUintN(32, bigint)))];
+}
+function BinaryGCD(a, b) {
+  if (a === 0n) {
+    return b;
+  }
+  if (b === 0n) {
+    return a;
+  }
+  const k = ctz1(a | b);
+  a >>= k;
+  b >>= k;
+  while (b !== 0n) {
+    b >>= ctz1(b);
+    if (a > b) {
+      const t = b;
+      b = a;
+      a = t;
+    }
+    b -= a;
+  }
+  return k === 0n ? a : a << k;
+}
+
 function FibonacciNumber(n) {
   console.assert(n > 0);
   var a = 0n;
@@ -77,24 +105,46 @@ function FibonacciNumber(n) {
   }
   return b;
 }
+
+function RandomBigInt(size) {
+  if (size <= 32) {
+    return BigInt(Math.floor(Math.random() * 2**size));
+  }
+  const q = Math.floor(size / 2);
+  return (RandomBigInt(size - q) << BigInt(q)) | RandomBigInt(q);
+}
+
+function test(a, b, f) {
+  const g = EuclideanGCD(a, b);
+  const count = 100000;
+  console.time();
+  for (let i = 0; i < count; i++) {
+    const I = BigInt(i);
+    if (f(a * I, b * I) !== g * I) {
+      throw new Error();
+    }
+  }
+  console.timeEnd();
+}
+
+const a1 = RandomBigInt(128);
+const b1 = RandomBigInt(128);
+
+test(a1, b1, LehmersGCD);
+// default: 426.200927734375 ms
+test(a1, b1, EuclideanGCD);
+// default: 1136.77294921875 ms
+test(a1, b1, BinaryGCD);
+// default: 1456.793212890625 ms
+
 const a = FibonacciNumber(186n);
 const b = FibonacciNumber(186n - 1n);
-const count = 100000;
-console.time();
-for (let i = 0; i < count; i++) {
-  if (gcd(a * BigInt(i), b * BigInt(i)) != i) {
-    throw new Error();
-  }
-}
-console.timeEnd();
-// default: 549.77490234375 ms
-console.time();
-for (let i = 0; i < count; i++) {
-  if (EuclideanGCD(a * BigInt(i), b * BigInt(i)) != i) {
-    throw new Error();
-  }
-}
-console.timeEnd();
-// default: 2974.14794921875 ms
+
+test(a, b, LehmersGCD);
+// default: 459.796875 ms
+test(a, b, EuclideanGCD);
+// default: 2565.871826171875 ms
+test(a, b, BinaryGCD);
+// default: 1478.333984375 ms
 
 ```
