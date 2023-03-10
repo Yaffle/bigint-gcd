@@ -243,11 +243,10 @@ function halfgcd(a, b, small) {
     // A*(X+Y) = A*X+A*Y
     //const [a1, b1] = [a + A, b + C]; // T * (a_initial + 1n, b_initial);
     //const [a2, b2] = [a + B, b + D]; // T * (a_initial, b_initial + 1n);
-    const n = step === 1 ? size : (isSmall ? bitLength2(a) : bitLength(a));
     //if (!isSmall && n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
     //  return [A, B, C, D, a, b];
     //}
-    const m = BigInt(isSmall ? Math.max(0, n - DIGITSIZE * (doubleDigitMethod ? 2 : 1)) : n - Math.floor(size / 2));
+    const m = BigInt(isSmall ? Math.max(0, bitLength2(a) - DIGITSIZE * (doubleDigitMethod ? 2 : 1)) : Math.floor(size / 2**step));
     if (step !== 1/* && m1 < size / 2*/) {//?
       if (((a + A) >> m) !== ((a + B) >> m) ||
           ((b + C) >> m) !== ((b + D) >> m)) {
@@ -316,7 +315,7 @@ function LehmersGCD(a, b) {
   while (BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b) {
     //console.assert(a >= b);
     const n = bitLength(a);
-    const m = BigInt(Math.floor(n / 2));
+    const m = BigInt(Math.floor(n * 2 / 3)); // 2/3 is somehow faster
     const [A1, B1, C1, D1, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, false);
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
