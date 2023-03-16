@@ -92,9 +92,9 @@ let DIGITSIZE_BIG = BigInt(DIGITSIZE);
 
 let wastCode2 = wast`
 (module
-  (type $type1 (func (param i64 i64 i64 i64 i64) (result i64 i64 i64 i64)))
+  (type $type1 (func (param i64 i64 i64 i64) (result i64 i64 i64 i64)))
   (export "helper" (func $helper))
-  (func $helper (param $x i64) (param $xlo i64) (param $y i64) (param $ylo i64) (param $lobits i64) (result i64 i64 i64 i64)
+  (func $helper (param $x i64) (param $xlo i64) (param $y i64) (param $ylo i64) (result i64 i64 i64 i64)
     (local $A i64)
     (local $B i64)
     (local $C i64)
@@ -112,20 +112,20 @@ let wastCode2 = wast`
     (local $bits i64)
     (local $xlo1 i64)
     (local $ylo1 i64)
+    (local $lobits i64)
     (local.set $A (i64.const 1))
     (local.set $B (i64.const 0))
     (local.set $C (i64.const 0))
     (local.set $D (i64.const 1))
-    (local.set $i (i32.const 4))
+    (local.set $i (i32.const 5))
+    (local.set $lobits (i64.add (i64.const 63) (i64.const 1)))
     (loop $loop1
-
       (local.set $A1 (local.get $A))
       (local.set $B1 (local.get $B))
       (local.set $C1 (local.get $C))
       (local.set $D1 (local.get $D))
       (local.set $y1 (local.get $y))
       (local.set $y (local.get $x))
-
       (loop $loop2
         (local.set $x (local.get $y))
         (local.set $y (local.get $y1))
@@ -133,8 +133,8 @@ let wastCode2 = wast`
         (local.set $B (local.get $B1))
         (local.set $C (local.get $C1))
         (local.set $D (local.get $D1))
-        (local.set $q (i64.div_s (local.get $x) (local.get $y)))
-        (local.set $y1 (i64.rem_s (local.get $x) (local.get $y)))
+        (local.set $q (i64.div_u (local.get $x) (local.get $y)))
+        (local.set $y1 (i64.rem_u (local.get $x) (local.get $y)))
         (local.set $A1 (local.get $C))
         (local.set $B1 (local.get $D))
         (local.set $C1 (i64.sub (local.get $A) (i64.mul (local.get $q) (local.get $C))))
@@ -142,40 +142,45 @@ let wastCode2 = wast`
         (local.set $sameQuotient
           (i32.and
             (i32.and
-              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $C)) (local.get $C) (i64.lt_s (local.get $C) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
-              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $D)) (local.get $D) (i64.lt_s (local.get $D) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
+              (i64.ge_u (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $C)) (local.get $C) (i64.lt_s (local.get $C) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
+              (i64.ge_u (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $D)) (local.get $D) (i64.lt_s (local.get $D) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
             )
             (i32.and
               (i32.and
-                (i64.le_s (i64.const 0) (i64.add (local.get $y1) (local.get $C1)))
-                (i64.lt_s (i64.add (local.get $y1) (local.get $C1)) (i64.add (local.get $y) (local.get $C)))
+                (i32.or (i64.ge_s (local.get $C1) (i64.const 0)) (i64.le_u (i64.sub (i64.const 0) (local.get $C1)) (local.get $y1)))
+                (i32.or (i64.lt_s (local.get $C1) (i64.const 0)) (i64.lt_u (i64.sub (local.get $C1) (local.get $C)) (i64.sub (local.get $y) (local.get $y1))))
               )
               (i32.and
-                (i64.le_s (i64.const 0) (i64.add (local.get $y1) (local.get $D1)))
-                (i64.lt_s (i64.add (local.get $y1) (local.get $D1)) (i64.add (local.get $y) (local.get $D)))
+                (i32.or (i64.ge_s (local.get $D1) (i64.const 0)) (i64.le_u (i64.sub (i64.const 0) (local.get $D1)) (local.get $y1)))
+                (i32.or (i64.lt_s (local.get $D1) (i64.const 0)) (i64.lt_u (i64.sub (local.get $D1) (local.get $D)) (i64.sub (local.get $y) (local.get $y1))))
               )
             )
           )
         )
         (br_if $loop2 (i32.ne (local.get $sameQuotient) (i32.const 0)))
       )
-
-      (local.set $xPlusMaxABclz (i64.clz (i64.add (local.get $x) (select (local.get $A) (local.get $B) (i64.gt_s (local.get $A) (local.get $B))))))
-      (local.set $yPlusMaxCDclz (i64.clz (i64.add (local.get $y) (select (local.get $C) (local.get $D) (i64.gt_s (local.get $C) (local.get $D))))))
-
+      (local.set $xPlusMaxABclz
+        (select
+         (i64.const 0)
+         (i64.clz (i64.add (local.get $x) (select (local.get $A) (local.get $B) (i64.gt_s (local.get $A) (local.get $B)))))
+         (i64.lt_s (local.get $x) (i64.const 0))
+        )
+      )
+      (local.set $yPlusMaxCDclz
+        (select
+         (i64.const 0)
+         (i64.clz (i64.add (local.get $y) (select (local.get $C) (local.get $D) (i64.gt_s (local.get $C) (local.get $D)))))
+         (i64.lt_s (local.get $y) (i64.const 0))
+        )
+      )
       (local.set $bits (select (local.get $xPlusMaxABclz) (local.get $yPlusMaxCDclz) (i64.lt_s (local.get $xPlusMaxABclz) (local.get $yPlusMaxCDclz))))
-      (local.set $bits (i64.sub (local.get $bits) (i64.const 1)))
-
-      (local.set $bits (select (local.get $bits) (i64.const 0) (i64.gt_s (local.get $bits) (i64.const 0))))
       (local.set $bits (select (local.get $lobits) (local.get $bits) (i64.gt_s (local.get $bits) (local.get $lobits))))
-
       (local.set $lobits (i64.sub (local.get $lobits) (local.get $bits)))
-      (local.set $xlo1 (i64.shr_s (local.get $xlo) (local.get $lobits)))
-      (local.set $ylo1 (i64.shr_s (local.get $ylo) (local.get $lobits)))
+      (local.set $xlo1 (i64.shr_u (local.get $xlo) (local.get $lobits)))
+      (local.set $ylo1 (i64.shr_u (local.get $ylo) (local.get $lobits)))
       (local.set $xlo (i64.sub (local.get $xlo) (i64.shl (local.get $xlo1) (local.get $lobits))))
       (local.set $ylo (i64.sub (local.get $ylo) (i64.shl (local.get $ylo1) (local.get $lobits))))
-
-      (local.set $x 
+      (local.set $x
          (i64.add
            (i64.add
              (i64.mul (local.get $A) (local.get $xlo1))
@@ -183,8 +188,8 @@ let wastCode2 = wast`
            )
            (i64.shl (local.get $x) (local.get $bits))
          )
-       )
-      (local.set $y 
+      )
+      (local.set $y
          (i64.add
            (i64.add
              (i64.mul (local.get $C) (local.get $xlo1))
@@ -192,8 +197,7 @@ let wastCode2 = wast`
            )
            (i64.shl (local.get $y) (local.get $bits))
          )
-       )
-
+      )
       (local.set $i (i32.sub (local.get $i) (i32.const 1)))
       (br_if $loop1 (i32.ne (local.get $i) (i32.const 0)))
     )
@@ -209,8 +213,8 @@ let wasmHelper = null;
 if (globalThis.WebAssembly != null) {
   try {
     wasmHelper = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode2))).exports.helper;
-    DIGITSIZE = 63;
-    DIGITSIZE_BIG = 63n;
+    DIGITSIZE = 64;
+    DIGITSIZE_BIG = 64n;
   } catch (error) {
     console.log(error);
   }
@@ -267,7 +271,7 @@ function helper(X, Y) {
     if (y === 0n) {
       return [1n, 0n, 0n, 1n];
     }
-    return wasmHelper(x, xlo, y, ylo, DIGITSIZE_BIG);
+    return wasmHelper(x, xlo, y, ylo);
   }
   return jsHelper(Number(x), Number(xlo), Number(y), Number(ylo));
 }
