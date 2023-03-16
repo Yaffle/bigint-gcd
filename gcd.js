@@ -142,8 +142,8 @@ let wastCode2 = wast`
         (local.set $sameQuotient
           (i32.and
             (i32.and
-              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $C)) (local.get $C) (i64.lt_s (local.get $C) (i64.const 0)))) (i64.clz (local.get $q))) (i64.const 66))
-              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $D)) (local.get $D) (i64.lt_s (local.get $D) (i64.const 0)))) (i64.clz (local.get $q))) (i64.const 66))
+              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $C)) (local.get $C) (i64.lt_s (local.get $C) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
+              (i64.ge_s (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $D)) (local.get $D) (i64.lt_s (local.get $D) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
             )
             (i32.and
               (i32.and
@@ -159,10 +159,13 @@ let wastCode2 = wast`
         )
         (br_if $loop2 (i32.ne (local.get $sameQuotient) (i32.const 0)))
       )
+
       (local.set $xPlusMaxABclz (i64.clz (i64.add (local.get $x) (select (local.get $A) (local.get $B) (i64.gt_s (local.get $A) (local.get $B))))))
       (local.set $yPlusMaxCDclz (i64.clz (i64.add (local.get $y) (select (local.get $C) (local.get $D) (i64.gt_s (local.get $C) (local.get $D))))))
+
       (local.set $bits (select (local.get $xPlusMaxABclz) (local.get $yPlusMaxCDclz) (i64.lt_s (local.get $xPlusMaxABclz) (local.get $yPlusMaxCDclz))))
       (local.set $bits (i64.sub (local.get $bits) (i64.const 1)))
+
       (local.set $bits (select (local.get $bits) (i64.const 0) (i64.gt_s (local.get $bits) (i64.const 0))))
       (local.set $bits (select (local.get $lobits) (local.get $bits) (i64.gt_s (local.get $bits) (local.get $lobits))))
 
@@ -314,7 +317,8 @@ function jsHelper(x, xlo, y, ylo) {
     }
 
     if (i >= 1) {
-      const bits = Math.min(Math.max(LOG2MAX - 0 - log2(Math.max(x + Math.max(A, B), y + Math.max(C, D))), 0), lobits);
+      const b = LOG2MAX - 0 - log2(Math.max(x + Math.max(A, B), y + Math.max(C, D)));
+      const bits = Math.min(Math.max(b, 0), lobits);
       const d = exp2(lobits - bits);
       const xlo1 = Math.floor(xlo / d);
       const ylo1 = Math.floor(ylo / d);

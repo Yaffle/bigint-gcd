@@ -1,6 +1,6 @@
 {
   "name": "bigint-gcd",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "greater common divisor (gcd) of two BigInt values using Lehmer's GCD algorithm",
   "main": "gcd.js",
   "type": "module",
@@ -18,6 +18,10 @@
     "Subquadratic",
     "greatest common divisor",
     "BigInt"
+  ],
+  "files": [
+    "gcd.js",
+    "wast2wasm.js"
   ],
   "author": "",
   "license": "SEE LICENSE IN LICENSE",
