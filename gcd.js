@@ -88,7 +88,7 @@ function log2(x) {
 
 const LOG2MAX = Math.floor(Math.log2(Number.MAX_SAFE_INTEGER + 1));
 let DIGITSIZE = LOG2MAX;
-let DIGITSIZE_BIG = BigInt(DIGITSIZE);
+const doubleDigitMethod = true;
 
 let wastCode2 = wast`
 (module
@@ -134,7 +134,7 @@ let wastCode2 = wast`
         (local.set $C (local.get $C1))
         (local.set $D (local.get $D1))
         (local.set $q (i64.div_u (local.get $x) (local.get $y)))
-        (local.set $y1 (i64.rem_u (local.get $x) (local.get $y)))
+        (local.set $y1 (i64.sub (local.get $x) (i64.mul (local.get $y) (local.get $q))))
         (local.set $A1 (local.get $C))
         (local.set $B1 (local.get $D))
         (local.set $C1 (i64.sub (local.get $A) (i64.mul (local.get $q) (local.get $C))))
@@ -142,18 +142,12 @@ let wastCode2 = wast`
         (local.set $sameQuotient
           (i32.and
             (i32.and
-              (i64.ge_u (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $C)) (local.get $C) (i64.lt_s (local.get $C) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
-              (i64.ge_u (i64.add (i64.clz (select (i64.sub (i64.const 0) (local.get $D)) (local.get $D) (i64.lt_s (local.get $D) (i64.const 0)))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
+              (i64.ge_u (i64.add (i64.add (i64.clz (i64.sub (i64.const 0) (local.get $C))) (i64.clz (local.get $C))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
+              (i64.ge_u (i64.add (i64.add (i64.clz (i64.sub (i64.const 0) (local.get $D))) (i64.clz (local.get $D))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
             )
-            (i32.and
-              (i32.and
-                (i32.or (i64.ge_s (local.get $C1) (i64.const 0)) (i64.le_u (i64.sub (i64.const 0) (local.get $C1)) (local.get $y1)))
-                (i32.or (i64.lt_s (local.get $C1) (i64.const 0)) (i64.lt_u (i64.sub (local.get $C1) (local.get $C)) (i64.sub (local.get $y) (local.get $y1))))
-              )
-              (i32.and
-                (i32.or (i64.ge_s (local.get $D1) (i64.const 0)) (i64.le_u (i64.sub (i64.const 0) (local.get $D1)) (local.get $y1)))
-                (i32.or (i64.lt_s (local.get $D1) (i64.const 0)) (i64.lt_u (i64.sub (local.get $D1) (local.get $D)) (i64.sub (local.get $y) (local.get $y1))))
-              )
+            (i32.or
+              (i32.and (i64.lt_s (local.get $C1) (i64.const 0)) (i32.and (i64.le_u (i64.sub (i64.const 0) (local.get $C1)) (local.get $y1)) (i64.lt_u (i64.sub (local.get $D1) (local.get $D)) (i64.sub (local.get $y) (local.get $y1)))))
+              (i32.and (i64.lt_s (local.get $D1) (i64.const 0)) (i32.and (i64.le_u (i64.sub (i64.const 0) (local.get $D1)) (local.get $y1)) (i64.lt_u (i64.sub (local.get $C1) (local.get $C)) (i64.sub (local.get $y) (local.get $y1)))))
             )
           )
         )
@@ -210,11 +204,10 @@ let wastCode2 = wast`
 `;
 
 let wasmHelper = null;
-if (globalThis.WebAssembly != null) {
+if (true && globalThis.WebAssembly != null) {
   try {
     wasmHelper = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode2))).exports.helper;
     DIGITSIZE = 64;
-    DIGITSIZE_BIG = 64n;
   } catch (error) {
     console.log(error);
   }
@@ -260,19 +253,33 @@ function exp2(n) {
   return result;
 }
 
-const doubleDigitMethod = true;
-
 function helper(X, Y) {
-  const x = doubleDigitMethod ? X >> DIGITSIZE_BIG : X;
-  const xlo = doubleDigitMethod ? BigInt.asUintN(DIGITSIZE, X) : 0n;
-  const y = doubleDigitMethod ? Y >> DIGITSIZE_BIG : Y;
-  const ylo = doubleDigitMethod ? BigInt.asUintN(DIGITSIZE, Y) : 0n;
+  if (!doubleDigitMethod) {
+    if (wasmHelper != null) {
+      if (Y === 0n) {
+        return [1n, 0n, 0n, 1n];
+      }
+      return wasmHelper(X, 0n, Y, 0n);
+    }
+    return jsHelper(Number(X), 0, Number(Y), 0);
+  }
   if (wasmHelper != null) {
+    if (DIGITSIZE !== 64) {
+      throw new RangeError();
+    }
+    const x = BigInt.asUintN(64, X >> 64n);
+    const xlo = BigInt.asUintN(64, X);
+    const y = BigInt.asUintN(64, Y >> 64n);
+    const ylo = BigInt.asUintN(64, Y);
     if (y === 0n) {
       return [1n, 0n, 0n, 1n];
     }
     return wasmHelper(x, xlo, y, ylo);
   }
+  const x = X >> BigInt(DIGITSIZE);
+  const xlo = BigInt.asUintN(DIGITSIZE, X);
+  const y = Y >> BigInt(DIGITSIZE);
+  const ylo = BigInt.asUintN(DIGITSIZE, Y);
   return jsHelper(Number(x), Number(xlo), Number(y), Number(ylo));
 }
 
@@ -309,6 +316,8 @@ function jsHelper(x, xlo, y, ylo) {
       // floor((x + B) / (y + D)) === q  <=>  0 <= (x + B) - q * (y + D) < (y + D)  <=>  0 <= y1 + D1 < y + D
       sameQuotient = 0 <= y1 + C1 && y1 + C1 < y + C &&
                      0 <= y1 + D1 && y1 + D1 < y + D;
+      //sameQuotient = C1 < 0 && -C1 <= y1 && D1 - D < y - y1 ||
+      //               D1 < 0 && -D1 <= y1 && C1 - C < y - y1;
       if (sameQuotient) {
         x = y;
         y = y1;
