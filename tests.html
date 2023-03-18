@@ -9,4 +9,10 @@ setTimeout(() => {
   console.assert(g.toString() === '1', g.toString());
 }, 100);
 
+// regression:
+var a = 47224680878584892774721521504636737681065246720n;
+var b = 43379638141618603274329264619520n;
+console.assert(gcd(a, b) === b);
+
+
 </script>
