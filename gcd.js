@@ -258,6 +258,9 @@ function exp2(n) {
 }
 
 function helper(X, Y) {
+  if (typeof X !== 'bigint' || typeof Y !== 'bigint') {
+    throw new TypeError();
+  }
   if (!doubleDigitMethod) {
     if (wasmHelper != null) {
       if (Y === 0n) {
