@@ -115,7 +115,7 @@ let wastCode2 = wast`
     (local.set $B (i64.const 0))
     (local.set $C (i64.const 0))
     (local.set $D (i64.const 1))
-    (local.set $i (i32.const 6))
+    (local.set $i (i32.const 7))
     (local.set $lobits (i64.add (i64.const 63) (i64.const 1)))
     (loop $loop1
       (local.set $A1 (local.get $A))
@@ -139,10 +139,7 @@ let wastCode2 = wast`
         (local.set $D1 (i64.sub (local.get $B) (i64.mul (local.get $q) (local.get $D))))
         (local.set $sameQuotient
           (i32.and
-            (i32.and
-              (i64.ge_u (i64.add (i64.add (i64.clz (i64.sub (i64.const 0) (local.get $C))) (i64.clz (local.get $C))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
-              (i64.ge_u (i64.add (i64.add (i64.clz (i64.sub (i64.const 0) (local.get $D))) (i64.clz (local.get $D))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 3)))
-            )
+            (i64.gt_u (i64.add (i64.add (i64.clz (i64.sub (i64.const 0) (local.get $D))) (i64.clz (local.get $D))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 1)))
             (i32.or
               (i32.and (i64.lt_s (local.get $C1) (i64.const 0)) (i32.and (i64.le_u (i64.sub (i64.const 0) (local.get $C1)) (local.get $y1)) (i64.lt_u (i64.sub (local.get $D1) (local.get $D)) (i64.sub (local.get $y) (local.get $y1)))))
               (i32.and (i64.lt_s (local.get $D1) (i64.const 0)) (i32.and (i64.le_u (i64.sub (i64.const 0) (local.get $D1)) (local.get $y1)) (i64.lt_u (i64.sub (local.get $C1) (local.get $C)) (i64.sub (local.get $y) (local.get $y1)))))
@@ -294,7 +291,7 @@ function jsHelper(x, xlo, y, ylo) {
 
   let lobits = LOG2MAX;
   let bits = 1;
-  for (let i = doubleDigitMethod ? 4 : 0; i >= 0 && bits !== 0; i -= 1) {
+  for (let i = doubleDigitMethod ? 5 : 0; i >= 0 && bits !== 0; i -= 1) {
 
     let sameQuotient = y !== 0;
     while (sameQuotient) {
