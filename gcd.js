@@ -205,28 +205,27 @@ if (true && globalThis.WebAssembly != null) {
 }
 
 
-let previousValue = -1;
+let previousValue = 0;
 // some terrible optimization as bitLength is slow
 function bitLength2(a) {
-  if (previousValue === -1) {
-    previousValue = bitLength(a);
-    return previousValue;
-  }
   if (previousValue <= 1024) {
-    let n = Number(BigInt(a));
-    let x = Math.log2(n) + 1024 * 4 - 1024 * 4;
-    let y = Math.ceil(x);
+    const n = Number(BigInt(a));
+    const x = Math.log2(n) + 1024 * 4 - 1024 * 4;
+    const y = Math.ceil(x);
     if (x !== y) {
       previousValue = y;
-      return y;
+      return previousValue;
     }
   }
-  let n = Number(a >> BigInt(previousValue - DIGITSIZE));
-  if (n < 1 || n >= (Number.MAX_SAFE_INTEGER + 1)) {
-    previousValue = -1;
-    return bitLength2(a);
+  if (previousValue < DIGITSIZE) {
+    previousValue = DIGITSIZE;
   }
-  previousValue = previousValue - DIGITSIZE + log2(n);
+  const n = Number(a >> BigInt(previousValue - DIGITSIZE));
+  if (n >= 1 && n <= Number.MAX_SAFE_INTEGER) {
+    previousValue = previousValue - DIGITSIZE + log2(n);
+    return previousValue;
+  }
+  previousValue = bitLength(a);
   return previousValue;
 }
 
