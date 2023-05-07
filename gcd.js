@@ -40,7 +40,10 @@ let wastCode1 = wast`
 let i64gcd = null;
 if (globalThis.WebAssembly != null) {
   try {
-    i64gcd = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode1))).exports.gcd;
+    const f = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode1))).exports.gcd;
+    if (f(BigInt(0), BigInt(0)) === BigInt(0)) {
+      i64gcd = f;
+    }
   } catch (error) {
     console.log(error);
   }
@@ -195,9 +198,12 @@ let wastCode2 = wast`
 `;
 
 let wasmHelper = null;
-if (true && globalThis.WebAssembly != null) {
+if (globalThis.WebAssembly != null) {
   try {
-    wasmHelper = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode2))).exports.helper;
+    const f = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode2))).exports.helper;
+    if (f(BigInt(1), BigInt(0), BigInt(1), BigInt(0)) != null) {
+      wasmHelper = f;
+    }
     DIGITSIZE = 64;
   } catch (error) {
     console.log(error);
