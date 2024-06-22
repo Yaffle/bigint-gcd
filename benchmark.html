@@ -12,7 +12,7 @@ function randomBigInt(size, random = Math.random) {
 function testRandomBigIntGCDPerformance() {
   // TODO: 30, 53
   for (let size = 64; size <= 8 * 1024 * 1024; size *= 2) {
-    const e = 6 - Math.floor((Math.round(Math.log2(size)) - 1) / 3);
+    const e = 7 - Math.floor((Math.round(Math.log2(size)) - 3) / 3);
     const count = Math.pow(10, Math.max(e, 0));
     const a = new Array(count);
     const b = new Array(count);
