@@ -175,88 +175,127 @@ function helper(X, Y) {
 
 
 
-function AsmModule() {
+function AsmModule(stdlib) {
   "use asm";
+  
+  var floor = stdlib.Math.floor;
+  var max = stdlib.Math.max;
+  var clz32 = stdlib.Math.clz32;
   
   var gA = 0.0;
   var gB = 0.0;
   var gC = 0.0;
   var gD = 0.0;
 
+
+// 1 + floor(log2(x))
+function log2(x) {
+  x = +x;
+  var e = 0;
+  while (x >= 4294967296.0) {
+    x = x * 2.3283064365386963e-10;
+    e = (e + 32) | 0;
+  }
+  e = (e + (32 - (clz32(~~x) | 0))) | 0;
+  return e | 0;
+}
+
 // 2**n
 function exp2(n) {
-  if (n < 0) {
-    throw new RangeError();
+  n = n | 0;
+  var result = 1.0;
+  while ((n | 0) < 0) {
+    n = (n + 32) | 0;
+    result = result * 2.3283064365386963e-10; // * 2**-32
   }
-  let result = 1;
-  while (n > 30) {
-    n -= 30;
-    result *= (1 << 30);
+  while ((n | 0) >= 32) {
+    n = (n - 32) | 0;
+    result = result * 4294967296.0; // * 2**32
   }
-  result *= (1 << n);
-  return result;
+  result = result * +((1 << n) >>> 0);
+  return +result;
 }
 
 function jsHelper(x, xlo, y, ylo, lobits) {
+  x = +x;
+  xlo = +xlo;
+  y = +y;
+  ylo = +ylo;
+  lobits = lobits | 0;
 
   // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q}} matrices,
   // where q is the quotient produced by Euclid's algorithm for any pair of integers (a, b),
   // where a within [X << m; ((X + 1) << m) - 1] and b within [Y << m; ((Y + 1) << m) - 1]
 
   // 2x2-matrix transformation matrix of (x_initial, y_initial) into (x, y):
-  let A = 1;
-  let B = 0;
-  let C = 0;
-  let D = 1;
+  var A = 1.0;
+  var B = 0.0;
+  var C = 0.0;
+  var D = 1.0;
 
-  let bits = 1;
-  for (let i = doubleDigitMethod ? 5 : 0; i >= 0 && bits !== 0; i -= 1) {
+  var bits = 1;
+  var sameQuotient = 0;
+  var q = 0.0;
+  var y1 = 0.0;
+  var A1 = 0.0;
+  var B1 = 0.0;
+  var C1 = 0.0;
+  var D1 = 0.0;
+  var b = 0;
+  var d = 0.0;
+  var dInv = 0.0;
+  var xlo1 = 0.0;
+  var ylo1 = 0.0;
+  var p = 0.0;
+  if (y != 0.0) {
+    do {
 
-    let sameQuotient = y !== 0;
-    while (sameQuotient) {
-      //console.assert(y > 0);
-      const q = Math.floor(+x / y);
-      const y1 = x - q * y;
-      // Multiply matrix augmented by column (x, y) by {{0, 1}, {1, -q}} from the right:
-      const A1 = C;
-      const B1 = D;
-      const C1 = A - q * C;
-      const D1 = B - q * D;
-      // The quotient for a point (x_initial + alpha, y_initial + beta), where 0 <= alpha < 1 and 0 <= beta < 1:
-      // floor((x + A * alpha + B * beta) / (y + C * alpha + D * beta))
-      // As the sign(A) === -sign(B) === -sign(C) === sign(D) (ignoring zero entries) the maximum and minimum values are floor((x + A) / (y + C)) and floor((x + B) / (y + D))
+      do {
+        //console.assert(y > 0);
+        q = floor(x / y);
+        y1 = x - q * y;
+        // Multiply matrix augmented by column (x, y) by {{0, 1}, {1, -q}} from the right:
+        A1 = C;
+        B1 = D;
+        C1 = A - q * C;
+        D1 = B - q * D;
+        // The quotient for a point (x_initial + alpha, y_initial + beta), where 0 <= alpha < 1 and 0 <= beta < 1:
+        // floor((x + A * alpha + B * beta) / (y + C * alpha + D * beta))
+        // As the sign(A) === -sign(B) === -sign(C) === sign(D) (ignoring zero entries) the maximum and minimum values are floor((x + A) / (y + C)) and floor((x + B) / (y + D))
 
-      // floor((x + A) / (y + C)) === q  <=>  0 <= (x + A) - q * (y + C) < (y + C)  <=>  0 <= y1 + C1 < y + C
-      // floor((x + B) / (y + D)) === q  <=>  0 <= (x + B) - q * (y + D) < (y + D)  <=>  0 <= y1 + D1 < y + D
-      sameQuotient = 0 <= y1 + C1 && y1 + C1 < y + C &&
-                     0 <= y1 + D1 && y1 + D1 < y + D;
-      //sameQuotient = C1 < 0 && -C1 <= y1 && D1 - D < y - y1 ||
-      //               D1 < 0 && -D1 <= y1 && C1 - C < y - y1;
-      if (sameQuotient) {
-        x = y;
-        y = y1;
-        A = A1;
-        B = B1;
-        C = C1;
-        D = D1;
-        //gcd.debug(q);
+        // floor((x + A) / (y + C)) === q  <=>  0 <= (x + A) - q * (y + C) < (y + C)  <=>  0 <= y1 + C1 < y + C
+        // floor((x + B) / (y + D)) === q  <=>  0 <= (x + B) - q * (y + D) < (y + D)  <=>  0 <= y1 + D1 < y + D
+        sameQuotient = (0.0 <= y1 + C1) & (y1 + C1 < y + C) &
+                       (0.0 <= y1 + D1) & (y1 + D1 < y + D);
+        //sameQuotient = C1 < 0 && -C1 <= y1 && D1 - D < y - y1 ||
+        //               D1 < 0 && -D1 <= y1 && C1 - C < y - y1;
+        if (sameQuotient) {
+          x = y;
+          y = y1;
+          A = A1;
+          B = B1;
+          C = C1;
+          D = D1;
+          //gcd.debug(q);
+        }
+      } while (sameQuotient);
+
+      b = (53 - (log2(x + max(A, B)) | 0)) | 0;
+      bits = (b | 0) < 0 ? b : ((b | 0) > (lobits | 0) ? lobits : b);
+      if ((b | 0) != 0) {
+        d = +exp2((lobits - bits) | 0);
+        dInv = +exp2((bits - lobits) | 0);
+        xlo1 = +floor(xlo * dInv);
+        ylo1 = +floor(ylo * dInv);
+        xlo = xlo - xlo1 * d;
+        ylo = ylo - ylo1 * d;
+        lobits = (lobits - bits) | 0;
+        p = +exp2(bits);
+        x = A * xlo1 + B * ylo1 + x * p;
+        y = C * xlo1 + D * ylo1 + y * p;
       }
-    }
 
-    if (i >= 1) {
-      const b = 53 - 0 - log2(x + Math.max(A, B));
-      bits = Math.min(Math.max(b, 0), lobits);
-      const d = exp2(lobits - bits);
-      const xlo1 = Math.floor(xlo / d);
-      const ylo1 = Math.floor(ylo / d);
-      xlo -= xlo1 * d;
-      ylo -= ylo1 * d;
-      lobits -= bits;
-      const p = exp2(bits);
-      x = A * xlo1 + B * ylo1 + x * p;
-      y = C * xlo1 + D * ylo1 + y * p;
-    }
-
+    } while ((bits | 0) != 0);
   }
   gA = A;
   gB = B;
