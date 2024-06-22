@@ -34,16 +34,16 @@ export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
         ymax = ymin0;
       }
       do {
-        const q = u64(u64(xmin) / u64(ymax));
+        const q = u64(xmin / ymax);
         // The quotient for any pair (x,y) is within floor(xmin / ymax) and floor(xmax / ymin) as x > 0 and y > 0
         // So we need to check that u64(xmax / ymin) == q if q === u64(xmax / ymin):
         // 0 <= xmax - q * ymin < ymin
-        if (!(xmax >= u64(q * ymin) && u64(xmax - u64(q * ymin)) < ymin)) {
+        if (!(u64(xmax) >= u64(q * ymin) && u64(xmax - u64(q * ymin)) < u64(ymin))) {
           // not same quotient
           break;
         }
         // continue Euclidean step:
-        i = i + 1;
+        i = i32(i + 1);
         const ymin1 = u64(xmin - u64(q * ymax));
         const ymax1 = u64(xmax - u64(q * ymin));
         const y1 = u64(x - u64(q * y));
@@ -70,23 +70,22 @@ export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
       }
 
       // add more bits from xlo and ylo:
-      bits = i32(i64.clz(u64(x + (A > B ? A : B)))); // xmax ?
-      bits = lobits < bits ? lobits : bits;
-      if (bits != 0) {
-        const s = lobits - bits;
-        const xlo1 = u64(xlo >> u64(s));
-        const ylo1 = u64(ylo >> u64(s));
+      bits = i32(i64.clz(i64(u64(x + (i64(A) > i64(B) ? A : B))))); // xmax ?
+      bits = i32(lobits) < i32(bits) ? lobits : bits;
+      if (i32(bits) != i32(0)) {
+        const s = i32(lobits - bits);
+        const xlo1 = u64(u64(xlo) >>> u64(s));
+        const ylo1 = u64(u64(ylo) >>> u64(s));
         xlo = u64(xlo - u64(xlo1 << u64(s)));
         ylo = u64(ylo - u64(ylo1 << u64(s)));
         x = u64(u64(u64(A * xlo1) + u64(B * ylo1)) + u64(x << u64(bits)));
         y = u64(u64(u64(C * xlo1) + u64(D * ylo1)) + u64(y << u64(bits)));
         lobits = s;
       }
-    } while (bits != 0);
+    } while (i32(bits) != i32(0));
   }
-  // AssemblyScript does not support multi-value return
-  // while it is a faster way to return 4 values and without using a memory
-  // it is possible to compile AssemblyScript to wat, then modify it, then use wat2wasm to compile into wasm.
+  // AssemblyScript does not support multi-value return.
+  // Performance of it is similar to the used method. Perhaps it would be faster to use the memory.
   gA = A;
   gB = B;
   gC = C;
@@ -94,7 +93,19 @@ export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
   return 0;
 }
 
-export let gA = i64(0);
-export let gB = i64(0);
-export let gC = i64(0);
-export let gD = i64(0);
+let gA = i64(0);
+let gB = i64(0);
+let gC = i64(0);
+let gD = i64(0);
+export function A():i64 {
+  return gA;
+}
+export function B():i64 {
+  return gB;
+}
+export function C():i64 {
+  return gC;
+}
+export function D():i64 {
+  return gD;
+}
