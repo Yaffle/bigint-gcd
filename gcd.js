@@ -216,6 +216,8 @@ function exp2(n) {
   return +result;
 }
 
+
+// @Deprecated, see helper64.js
 function jsHelper(x, xlo, y, ylo, lobits) {
   x = +x;
   xlo = +xlo;
@@ -223,9 +225,9 @@ function jsHelper(x, xlo, y, ylo, lobits) {
   ylo = +ylo;
   lobits = lobits | 0;
 
-  // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q}} matrices,
-  // where q is the quotient produced by Euclid's algorithm for any pair of integers (a, b),
-  // where a within [X << m; ((X + 1) << m) - 1] and b within [Y << m; ((Y + 1) << m) - 1]
+  // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q_i}} matrices,
+  // where q_i are the quotients produced by Euclidean algorithm for any pair of integers (a, b),
+  // where a within [x, x + 1] and b within [y, y + 1]
 
   // 2x2-matrix transformation matrix of (x_initial, y_initial) into (x, y):
   var A = 1.0;
@@ -233,7 +235,7 @@ function jsHelper(x, xlo, y, ylo, lobits) {
   var C = 0.0;
   var D = 1.0;
 
-  var bits = 1;
+  var bits = 0;
   var sameQuotient = 0;
   var q = 0.0;
   var y1 = 0.0;
@@ -249,7 +251,6 @@ function jsHelper(x, xlo, y, ylo, lobits) {
   var p = 0.0;
   if (y != 0.0) {
     do {
-
       do {
         //console.assert(y > 0);
         q = floor(x / y);
