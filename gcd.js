@@ -1,8 +1,7 @@
 /*jshint esversion:11*/
 
-import wast2wasm from './wast2wasm.js';
-
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+const U64_MAX = BigInt.asUintN(64, -1n);
 
 //TODO: https://en.wikipedia.org/wiki/Euclidean_algorithm#Method_of_least_absolute_remainders
 function numbersGCD(a, b) {
@@ -15,32 +14,27 @@ function numbersGCD(a, b) {
   return a;
 }
 
-const wast = (strings) => String.raw({ raw: strings });
+/*
 
-let wastCode1 = wast`
-(module
-  (type $type1 (func (param i64 i64) (result i64)))
-  (export "gcd" (func $gcd))
-  (func $gcd (param $a i64) (param $b i64) (result i64)
-   (local $r i64)
-   (loop $loop1
-    (if (i64.ne (local.get $b) (i64.const 0))
-     (block
-      (local.set $r (i64.rem_u (local.get $a) (local.get $b)))
-      (local.set $a (local.get $b))
-      (local.set $b (local.get $r))
-      (br $loop1)
-     )
-    )
-   )
-   (local.get $a)
-  )
-)`;
+export function gcd(a:u64, b:u64):u64 {
+  if (b !== 0) {
+    do {
+      const r = a % b;
+      a = b;
+      b = r;
+    } while (b !== 0);
+  }
+  return a;
+}
+
+*/
+
+const i64gcdCode = new Uint8Array([0,97,115,109,1,0,0,0,1,7,1,96,2,126,126,1,126,3,2,1,0,7,7,1,3,103,99,100,0,0,10,39,1,37,1,1,126,32,1,66,0,82,4,64,3,64,32,0,32,1,130,33,2,32,1,33,0,32,2,34,1,66,0,82,13,0,11,11,32,0,11]);
 
 let i64gcd = null;
 if (globalThis.WebAssembly != null) {
   try {
-    const f = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode1))).exports.gcd;
+    const f = new WebAssembly.Instance(new WebAssembly.Module(i64gcdCode)).exports.gcd;
     if (f(BigInt(0), BigInt(0)) === BigInt(0)) {
       i64gcd = f;
     }
@@ -50,16 +44,20 @@ if (globalThis.WebAssembly != null) {
 }
 
 function EuclidsGCD(a, b) {
-  while (b > MAX_SAFE_INTEGER) {
+  const M = i64gcd != null ? U64_MAX : MAX_SAFE_INTEGER;
+  while (b > M) {
     const r = a % b;
     a = b;
     b = r;
   }
   if (b > 0n) {
-    if (a > MAX_SAFE_INTEGER) {
+    if (a > M) {
       const r = a % b;
       a = b;
       b = r;
+    }
+    if (i64gcd != null) {
+      return BigInt.asUintN(64, i64gcd(a, b));
     }
     return BigInt(numbersGCD(Number(a), Number(b)));
   }
@@ -89,133 +87,42 @@ function log2(x) {
   return e;
 }
 
-const LOG2MAX = Math.floor(Math.log2(Number.MAX_SAFE_INTEGER + 1));
-let DIGITSIZE = LOG2MAX;
+let DIGITSIZE = 53;
 const doubleDigitMethod = true;
 
-let wastCode2 = wast`
-(module
-  (type $type1 (func (param i64 i64 i64 i64) (result i64 i64 i64 i64)))
-  (export "helper" (func $helper))
-  (func $helper (param $x i64) (param $xlo i64) (param $y i64) (param $ylo i64) (result i64 i64 i64 i64)
-    (local $A i64)
-    (local $B i64)
-    (local $C i64)
-    (local $D i64)
-    (local $i i32)
-    (local $q i64)
-    (local $y1 i64)
-    (local $A1 i64)
-    (local $B1 i64)
-    (local $C1 i64)
-    (local $D1 i64)
-    (local $sameQuotient i32)
-    (local $bits i64)
-    (local $xlo1 i64)
-    (local $ylo1 i64)
-    (local $lobits i64)
-    (local.set $A (i64.const 1))
-    (local.set $B (i64.const 0))
-    (local.set $C (i64.const 0))
-    (local.set $D (i64.const 1))
-    (local.set $i (i32.const 7))
-    (local.set $lobits (i64.add (i64.const 63) (i64.const 1)))
-    (loop $loop1
-      (local.set $A1 (local.get $A))
-      (local.set $B1 (local.get $B))
-      (local.set $C1 (local.get $C))
-      (local.set $D1 (local.get $D))
-      (local.set $y1 (local.get $y))
-      (local.set $y (local.get $x))
-      (loop $loop2
-        (local.set $x (local.get $y))
-        (local.set $y (local.get $y1))
-        (local.set $A (local.get $A1))
-        (local.set $B (local.get $B1))
-        (local.set $C (local.get $C1))
-        (local.set $D (local.get $D1))
-        (local.set $q (i64.div_u (local.get $x) (local.get $y)))
-        (local.set $y1 (i64.sub (local.get $x) (i64.mul (local.get $y) (local.get $q))))
-        (local.set $A1 (local.get $C))
-        (local.set $B1 (local.get $D))
-        (local.set $C1 (i64.sub (local.get $A) (i64.mul (local.get $q) (local.get $C))))
-        (local.set $D1 (i64.sub (local.get $B) (i64.mul (local.get $q) (local.get $D))))
-        (local.set $sameQuotient
-          (i32.and
-            (i64.gt_u (i64.add (i64.add (i64.clz (i64.sub (i64.const 0) (local.get $D))) (i64.clz (local.get $D))) (i64.clz (local.get $q))) (i64.add (i64.const 63) (i64.const 1)))
-            (i32.or
-              (i32.and (i64.lt_s (local.get $C1) (i64.const 0)) (i32.and (i64.le_u (i64.sub (i64.const 0) (local.get $C1)) (local.get $y1)) (i64.lt_u (i64.sub (local.get $D1) (local.get $D)) (i64.sub (local.get $y) (local.get $y1)))))
-              (i32.and (i64.lt_s (local.get $D1) (i64.const 0)) (i32.and (i64.le_u (i64.sub (i64.const 0) (local.get $D1)) (local.get $y1)) (i64.lt_u (i64.sub (local.get $C1) (local.get $C)) (i64.sub (local.get $y) (local.get $y1)))))
-            )
-          )
-        )
-        (br_if $loop2 (i32.ne (local.get $sameQuotient) (i32.const 0)))
-      )
-      (local.set $bits
-        (select
-         (i64.const 0)
-         (i64.clz (i64.add (local.get $x) (select (local.get $A) (local.get $B) (i64.gt_s (local.get $A) (local.get $B)))))
-         (i64.lt_s (local.get $x) (i64.const 0))
-        )
-      )
-    (if (i64.ne (local.get $bits) (i64.const 0))
-     (block
-      (local.set $bits (select (local.get $lobits) (local.get $bits) (i64.gt_s (local.get $bits) (local.get $lobits))))
-      (local.set $lobits (i64.sub (local.get $lobits) (local.get $bits)))
-      (local.set $xlo1 (i64.shr_u (local.get $xlo) (local.get $lobits)))
-      (local.set $ylo1 (i64.shr_u (local.get $ylo) (local.get $lobits)))
-      (local.set $xlo (i64.sub (local.get $xlo) (i64.shl (local.get $xlo1) (local.get $lobits))))
-      (local.set $ylo (i64.sub (local.get $ylo) (i64.shl (local.get $ylo1) (local.get $lobits))))
-      (local.set $x
-         (i64.add
-           (i64.add
-             (i64.mul (local.get $A) (local.get $xlo1))
-             (i64.mul (local.get $B) (local.get $ylo1))
-           )
-           (i64.shl (local.get $x) (local.get $bits))
-         )
-      )
-      (local.set $y
-         (i64.add
-           (i64.add
-             (i64.mul (local.get $C) (local.get $xlo1))
-             (i64.mul (local.get $D) (local.get $ylo1))
-           )
-           (i64.shl (local.get $y) (local.get $bits))
-         )
-      )
-      (local.set $i (i32.sub (local.get $i) (i32.const 1)))
-     )
-    )
-      (br_if $loop1 (i32.and (i32.ne (local.get $i) (i32.const 0)) (i64.ne (local.get $bits) (i64.const 0))))
-    )
-    (local.get $A)
-    (local.get $B)
-    (local.get $C)
-    (local.get $D)
-  )
-)
-`;
+const wasmCode2 = new Uint8Array([0,97,115,109,1,0,0,0,1,14,2,96,0,1,126,96,5,126,126,126,126,127,1,127,3,6,5,1,0,0,0,0,5,3,1,0,0,6,21,4,126,1,66,0,11,126,1,66,0,11,126,1,66,0,11,126,1,66,0,11,7,35,6,6,104,101,108,112,101,114,0,0,1,65,0,1,1,66,0,2,1,67,0,3,1,68,0,4,6,109,101,109,111,114,121,2,0,10,142,3,5,247,2,2,8,126,2,127,66,1,33,6,66,1,33,9,32,0,66,127,82,32,2,66,0,82,113,4,64,3,64,32,0,32,7,124,33,7,32,0,32,6,124,33,6,32,2,32,5,124,33,5,32,2,32,9,124,33,9,32,14,65,1,113,4,126,32,7,33,8,32,6,33,7,32,8,33,6,32,5,33,8,32,9,33,5,32,8,5,32,9,11,33,8,3,64,32,6,32,7,32,8,128,34,12,32,5,126,34,9,125,32,5,84,32,6,32,9,90,113,4,64,32,14,65,1,106,33,14,32,7,32,8,32,12,126,125,33,11,32,6,32,9,125,33,10,32,0,32,2,32,12,126,125,33,9,32,5,33,7,32,8,33,6,32,2,33,0,32,11,33,5,32,10,33,8,32,9,33,2,12,1,11,11,32,6,32,0,125,33,6,32,7,32,0,125,33,7,32,5,32,2,125,33,5,32,8,32,2,125,33,9,32,14,65,1,113,4,64,32,6,33,8,32,7,33,6,32,8,33,7,32,5,33,8,32,9,33,5,32,8,33,9,11,32,4,32,0,32,6,32,7,32,6,32,7,85,27,124,121,167,34,13,32,4,32,13,72,27,34,13,4,64,32,1,32,1,32,4,32,13,107,34,4,172,34,8,136,34,11,32,8,134,125,33,1,32,3,32,3,32,8,136,34,10,32,8,134,125,33,3,32,6,32,11,126,32,7,32,10,126,124,32,0,32,13,172,34,8,134,124,33,0,32,5,32,11,126,32,9,32,10,126,124,32,2,32,8,134,124,33,2,11,32,13,13,0,11,11,32,6,36,0,32,7,36,1,32,5,36,2,32,9,36,3,65,0,11,4,0,35,0,11,4,0,35,1,11,4,0,35,2,11,4,0,35,3,11]);
 
 let wasmHelper = null;
-if (globalThis.WebAssembly != null) {
+if (true && globalThis.WebAssembly != null) {
   try {
-    const f = new WebAssembly.Instance(new WebAssembly.Module(wast2wasm(wastCode2))).exports.helper;
-    if (f(BigInt(1), BigInt(0), BigInt(1), BigInt(0)) != null) {
-      wasmHelper = f;
+    const exports = new WebAssembly.Instance(new WebAssembly.Module(wasmCode2)).exports;
+    if (exports.helper(BigInt(1), BigInt(0), BigInt(1), BigInt(0)) != null) {
+      wasmHelper = function (x, xlo, y, ylo, lobits) {
+        exports.helper(x, xlo, y, ylo, lobits);
+        return [exports.A(), exports.B(), exports.C(), exports.D()];
+      };
+      DIGITSIZE = 64;
     }
-    DIGITSIZE = 64;
   } catch (error) {
     console.log(error);
   }
 }
 
 
+const frexpf64 = new Float64Array(1);
+const frexpi32 = new Int32Array(frexpf64.buffer);
+
 let previousValue = 0;
 // some terrible optimization as bitLength is slow
 function bitLength2(a) {
   if (previousValue <= 1024) {
     const n = Number(BigInt(a));
+    frexpf64[0] = n;
+    const e = (frexpi32[1] >> 20) - 1023;
+    if (e < 1024 && frexpi32[0] !== 0 || (frexpi32[1] & 0xFFFFF) !== 0) {
+      previousValue = e + 1;
+      return previousValue;
+    }
     const x = Math.log2(n) + 1024 * 4 - 1024 * 4;
     const y = Math.ceil(x);
     if (x !== y) {
@@ -235,6 +142,47 @@ function bitLength2(a) {
   return previousValue;
 }
 
+
+function helper(X, Y) {
+  if (typeof X !== 'bigint' || typeof Y !== 'bigint') {
+    throw new TypeError();
+  }
+  if (!doubleDigitMethod) {
+    if (wasmHelper != null) {
+      return wasmHelper(X, 0n, Y, 0n, 0);
+    }
+    return jsHelper(X, 0n, Y, 0n, 0);
+  }
+  if (wasmHelper != null) {
+    if (DIGITSIZE !== 64) {
+      throw new RangeError();
+    }
+    const x = BigInt.asUintN(64, X >> 64n);
+    const xlo = BigInt.asUintN(64, X);
+    const y = BigInt.asUintN(64, Y >> 64n);
+    const ylo = BigInt.asUintN(64, Y);
+    return wasmHelper(x, xlo, y, ylo, 64);
+  }
+  if (DIGITSIZE !== 53) {
+    throw new RangeError();
+  }
+  const x = X >> 53n;
+  const xlo = BigInt.asUintN(53, X);
+  const y = Y >> 53n;
+  const ylo = BigInt.asUintN(53, Y);
+  return jsHelper(x, xlo, y, ylo, 53);
+}
+
+
+
+function AsmModule() {
+  "use asm";
+  
+  var gA = 0.0;
+  var gB = 0.0;
+  var gC = 0.0;
+  var gD = 0.0;
+
 // 2**n
 function exp2(n) {
   if (n < 0) {
@@ -249,40 +197,7 @@ function exp2(n) {
   return result;
 }
 
-function helper(X, Y) {
-  if (typeof X !== 'bigint' || typeof Y !== 'bigint') {
-    throw new TypeError();
-  }
-  if (!doubleDigitMethod) {
-    if (wasmHelper != null) {
-      if (Y === 0n) {
-        return [1n, 0n, 0n, 1n];
-      }
-      return wasmHelper(X, 0n, Y, 0n);
-    }
-    return jsHelper(Number(X), 0, Number(Y), 0);
-  }
-  if (wasmHelper != null) {
-    if (DIGITSIZE !== 64) {
-      throw new RangeError();
-    }
-    const x = BigInt.asUintN(64, X >> 64n);
-    const xlo = BigInt.asUintN(64, X);
-    const y = BigInt.asUintN(64, Y >> 64n);
-    const ylo = BigInt.asUintN(64, Y);
-    if (y === 0n) {
-      return [1n, 0n, 0n, 1n];
-    }
-    return wasmHelper(x, xlo, y, ylo);
-  }
-  const x = X >> BigInt(DIGITSIZE);
-  const xlo = BigInt.asUintN(DIGITSIZE, X);
-  const y = Y >> BigInt(DIGITSIZE);
-  const ylo = BigInt.asUintN(DIGITSIZE, Y);
-  return jsHelper(Number(x), Number(xlo), Number(y), Number(ylo));
-}
-
-function jsHelper(x, xlo, y, ylo) {
+function jsHelper(x, xlo, y, ylo, lobits) {
 
   // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q}} matrices,
   // where q is the quotient produced by Euclid's algorithm for any pair of integers (a, b),
@@ -294,7 +209,6 @@ function jsHelper(x, xlo, y, ylo) {
   let C = 0;
   let D = 1;
 
-  let lobits = LOG2MAX;
   let bits = 1;
   for (let i = doubleDigitMethod ? 5 : 0; i >= 0 && bits !== 0; i -= 1) {
 
@@ -330,7 +244,7 @@ function jsHelper(x, xlo, y, ylo) {
     }
 
     if (i >= 1) {
-      const b = LOG2MAX - 0 - log2(x + Math.max(A, B));
+      const b = 53 - 0 - log2(x + Math.max(A, B));
       bits = Math.min(Math.max(b, 0), lobits);
       const d = exp2(lobits - bits);
       const xlo1 = Math.floor(xlo / d);
@@ -344,8 +258,36 @@ function jsHelper(x, xlo, y, ylo) {
     }
 
   }
-  return [BigInt(A), BigInt(B), BigInt(C), BigInt(D)];
+  gA = A;
+  gB = B;
+  gC = C;
+  gD = D;
+  return 0;
 }
+
+  function A() {
+    return gA;
+  }
+  function B() {
+    return gB;
+  }
+  function C() {
+    return gC;
+  }
+  function D() {
+    return gD;
+  }
+
+  return {helper: jsHelper, A: A, B: B, C: C, D: D};
+}
+
+const asmExports = AsmModule(globalThis);
+const jsHelper = function (x, xlo, y, ylo, lobits) {
+  asmExports.helper(Number(x), Number(xlo), Number(y), Number(ylo), lobits);
+  return [BigInt(asmExports.A()), BigInt(asmExports.B()), BigInt(asmExports.C()), BigInt(asmExports.D())];
+};
+
+
 
 const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
 
@@ -438,6 +380,13 @@ function halfgcd(a, b, small) {
 const SUBQUADRATIC_GCD_THRESHOLD = (32 * 1024);
 const LEHMERS_ALGORITHM_THRESHOLD = BigInt(2**68);
 
+const toBigIntu64 = new BigUint64Array(1);
+const toBigInti32 = new Int32Array(toBigIntu64.buffer);
+const toBigInt = function (i) {
+  toBigInti32[0] = i;
+  return toBigIntu64[0];
+};
+
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
 // this implementation is good after ~80 bits (?)
@@ -472,14 +421,21 @@ function LehmersGCD(a, b) {
   while (b >= LEHMERS_ALGORITHM_THRESHOLD) {
     //console.assert(a >= b);
     const n = bitLength2(a);
-    const m = BigInt(Math.max(0, n - DIGITSIZE * (doubleDigitMethod ? 2 : 1)));
-    const [A1, B1, C1, D1] = helper(a >> m, b >> m);
+    const m = Math.max(0, n - DIGITSIZE * (doubleDigitMethod ? 2 : 1));
+    const [A1, B1, C1, D1] = helper((m === 0 ? a : a >> toBigInt(m)), (m === 0 ? b : b >> toBigInt(m)));
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       //gcd.debug(a / b);
       [a, b] = [b, a % b];
+      console.debug('%');
     } else {
+      if (LehmersGCD.progress != null) {
+        LehmersGCD.progress.push(bitLength(b));
+      }
       [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T * (a, b)
+      if (LehmersGCD.progress != null) {
+        LehmersGCD.progress.push(bitLength(b));
+      }
       if (a < 0n || b < 0n) {
         throw new TypeError("assertion");
       }
@@ -522,25 +478,46 @@ function ctz(a) {
 function bigIntGCD(a, b) {
   const A = abs(BigInt(a));
   const B = abs(BigInt(b));
-  const na = Number(A);
-  const nb = Number(B);
-  if (Math.max(na, nb) <= Number.MAX_SAFE_INTEGER) {
-    return BigInt(numbersGCD(na, nb));
-  }
-  const abmin = Math.min(na, nb);
-  if (abmin <= Number.MAX_SAFE_INTEGER) {
-    if (abmin === 0) {
-      return A + B;
+
+  if (i64gcd == null) {
+    const na = Number(A);
+    const nb = Number(B);
+    if (Math.max(na, nb) <= Number.MAX_SAFE_INTEGER) {
+      return BigInt(numbersGCD(na, nb));
     }
-    if (abmin === 1) {
-      return 1n;
+    const abmin = Math.min(na, nb);
+    if (abmin <= Number.MAX_SAFE_INTEGER) {
+      if (abmin === 0) {
+        return A + B;
+      }
+      if (abmin === 1) {
+        return 1n;
+      }
+      return BigInt(numbersGCD(abmin, Math.abs(Number(na < nb ? B % A : A % B))));
     }
-    return BigInt(numbersGCD(abmin, Math.abs(Number(na < nb ? B % A : A % B))));
   }
-  if (i64gcd != null && Math.max(na, nb) < 2**64) {
-    return BigInt.asUintN(64, i64gcd(A, B));
+  if (i64gcd != null) {
+    const isASmall = BigInt.asUintN(64, A) === A;
+    const isBSmall = BigInt.asUintN(64, B) === B;
+    if (isASmall && isBSmall) {
+      return BigInt.asUintN(64, i64gcd(A, B));
+    } else if (isASmall || isBSmall) {
+      if (a === 0n) {
+        return b;
+      }
+      if (b === 0n) {
+        return a;
+      }
+      if (a === 1n) {
+        return 1n;
+      }
+      if (b === 1n) {
+        return 1n;
+      }
+      return BigInt.asUintN(64, i64gcd(isASmall ? A : A % B, isBSmall ? B : B % A));
+    }
   }
-  if (abmin > (Number.MAX_SAFE_INTEGER + 1) * (1 << 11)) {
+  if (true) {
     const c1 = ctz(A);
     const c2 = ctz(B);
     if (c1 + c2 >= 4) {
@@ -553,3 +530,4 @@ function bigIntGCD(a, b) {
 }
 
 export default bigIntGCD;
+//globalThis.bigIntGCD = bigIntGCD;
