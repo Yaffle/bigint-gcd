@@ -14,5 +14,12 @@ var a = 47224680878584892774721521504636737681065246720n;
 var b = 43379638141618603274329264619520n;
 console.assert(gcd(a, b) === b);
 
+console.assert(gcd(18446744073709551615n, 18446744073709551615n) === 18446744073709551615n);
+
+const u128 = function (hi, lo) {
+  return (BigInt.asUintN(64, hi) << 64n) | BigInt.asUintN(64, lo);
+};
+console.assert(gcd((u128(2n**64n - 1n, 312n) << 100n) + 1n, (u128(1n, 311n) << 100n) + 1n) === 1n);
+
 
 </script>
