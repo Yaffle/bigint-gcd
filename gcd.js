@@ -109,19 +109,21 @@ if (true && globalThis.WebAssembly != null) {
 }
 
 
-const frexpf64 = new Float64Array(1);
-const frexpi32 = new Int32Array(frexpf64.buffer);
+const frexpf64 = typeof Float64Array !== 'undefined' ? new Float64Array(1) : null;
+const frexpi32 = typeof Float64Array !== 'undefined' ? new Int32Array(frexpf64.buffer) : null;
 
 let previousValue = 0;
 // some terrible optimization as bitLength is slow
 function bitLength2(a) {
   if (previousValue <= 1024) {
     const n = Number(BigInt(a));
-    frexpf64[0] = n;
-    const e = (frexpi32[1] >> 20) - 1023;
-    if (e < 1024 && frexpi32[0] !== 0 || (frexpi32[1] & 0xFFFFF) !== 0) {
-      previousValue = e + 1;
-      return previousValue;
+    if (frexpf64 != null) {
+      frexpf64[0] = n;
+      const e = (frexpi32[1] >> 20) - 1023;
+      if (e < 1024 && frexpi32[0] !== 0 || (frexpi32[1] & 0xFFFFF) !== 0) {
+        previousValue = e + 1;
+        return previousValue;
+      }
     }
     const x = Math.log2(n) + 1024 * 4 - 1024 * 4;
     const y = Math.ceil(x);
@@ -420,11 +422,14 @@ function halfgcd(a, b, small) {
 const SUBQUADRATIC_GCD_THRESHOLD = (32 * 1024);
 const LEHMERS_ALGORITHM_THRESHOLD = BigInt(2**68);
 
-const toBigIntu64 = new BigUint64Array(1);
-const toBigInti32 = new Int32Array(toBigIntu64.buffer);
+const toBigIntu64 = typeof BigUint64Array !== 'undefined' ? new BigUint64Array(1) : null;
+const toBigInti32 = typeof BigUint64Array !== 'undefined' ? new Int32Array(toBigIntu64.buffer) : null;
 const toBigInt = function (i) {
-  toBigInti32[0] = i;
-  return toBigIntu64[0];
+  if (toBigIntu64 != null) {
+    toBigInti32[0] = i;
+    return toBigIntu64[0];
+  }
+  return BigInt(i);
 };
 
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
