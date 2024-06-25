@@ -38,7 +38,7 @@ export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
         // The quotient for any pair (x,y) is within floor(xmin / ymax) and floor(xmax / ymin) as x > 0 and y > 0
         // So we need to check that u64(xmax / ymin) == q if q === u64(xmax / ymin):
         // 0 <= xmax - q * ymin < ymin
-        if (!(u64(xmax) >= u64(q * ymin) && u64(xmax - u64(q * ymin)) < u64(ymin))) {
+        if (u64(xmax - u64(q * ymin)) >= u64(ymin)) {
           // not same quotient
           break;
         }
