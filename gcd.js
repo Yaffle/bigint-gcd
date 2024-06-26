@@ -472,7 +472,7 @@ function LehmersGCD(a, b) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       //gcd.debug(a / b);
       [a, b] = [b, a % b];
-      console.debug('%');
+      //console.debug('%');
     } else {
       if (LehmersGCD.progress != null) {
         LehmersGCD.progress.push(bitLength(b));
@@ -547,16 +547,16 @@ function bigIntGCD(a, b) {
     if (isASmall && isBSmall) {
       return BigInt.asUintN(64, i64gcd(A, B));
     } else if (isASmall || isBSmall) {
-      if (a === 0n) {
-        return b;
+      if (A === 0n) {
+        return B;
       }
-      if (b === 0n) {
-        return a;
+      if (B === 0n) {
+        return A;
       }
-      if (a === 1n) {
+      if (A === 1n) {
         return 1n;
       }
-      if (b === 1n) {
+      if (B === 1n) {
         return 1n;
       }
       return BigInt.asUintN(64, i64gcd(isASmall ? A : A % B, isBSmall ? B : B % A));
