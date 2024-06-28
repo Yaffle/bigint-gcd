@@ -44,6 +44,9 @@ if (globalThis.WebAssembly != null) {
 }
 
 function EuclidsGCD(a, b) {
+  if (typeof a !== 'bigint' || typeof b !== 'bigint') {
+    throw new TypeError();
+  }
   const M = i64gcd != null ? U64_MAX : MAX_SAFE_INTEGER;
   while (b > M) {
     const r = a % b;
@@ -323,9 +326,9 @@ function jsHelper(x, xlo, y, ylo, lobits) {
   return {helper: jsHelper, A: A, B: B, C: C, D: D};
 }
 
-const asmExports = AsmModule(globalThis);
+const asmExports = wasmHelper == null ? AsmModule(globalThis) : null;
 const jsHelper = function (x, xlo, y, ylo, lobits) {
-  asmExports.helper(Number(x), Number(xlo), Number(y), Number(ylo), lobits);
+  asmExports.helper(Number(BigInt(x)), Number(BigInt(xlo)), Number(BigInt(y)), Number(BigInt(ylo)), lobits);
   return [BigInt(asmExports.A()), BigInt(asmExports.B()), BigInt(asmExports.C()), BigInt(asmExports.D())];
 };
 
