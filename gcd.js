@@ -336,87 +336,109 @@ const jsHelper = function (x, xlo, y, ylo, lobits) {
 
 const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
 
-function matrixMultiply(A1, B1, C1, D1, A, B, C, D) {
-  return [A1 * A + B1 * C, A1 * B + B1 * D,
-          C1 * A + D1 * C, C1 * B + D1 * D];
-}
-
-function halfgcd(a, b, small) {
-  //console.assert(a >= b && b >= 0n);
-
-  // the function calculates the transformation matrix for numbers (x, y), where a <= x < a + 1 and b <= y < b + 1
-  // seems, this definition is not the same as in https://mathworld.wolfram.com/Half-GCD.html
-
+//TODO: remove those comments:
   // floor((a + 1) / b) < q = floor(a / b) < floor(a / (b + 1))
   // ([A, B], [C, D]) * (a + x, b + y) = (A*(a+x)+B*(b+y), C*(a+x)+D*(b+y)) = (A*a+B*b, C*a+D*b) + (A*x+B*y, C*x+D*y)
-  //Note: for debugging it is useful to compare quotients in simple Euclidean algorithms vs quotients here
 
-  if (small) {
-    const [A, B, C, D] = helper(a, b);
-    return [A, B, C, D, 0n, 0n];
-  }
-  const size = bitLength(a);
+  //console.assert(A * D >= 0 && B * C >= 0 && A * B <= 0 && D * C <= 0);//TODO: why - ?
+  //const [a1, b1] = [a + A, b + C]; // T * (a_initial + 1n, b_initial);
+  //const [a2, b2] = [a + B, b + D]; // T * (a_initial, b_initial + 1n);
+  //if (!isSmall && n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
+  //  return [A, B, C, D, a, b];
+  //}
+
+function halfgcd(a, b) {
+  //console.assert(a >= b && b >= 0n);
+
+  // The function calculates the transformation matrix for numbers (x, y), where a <= x < a + 1 and b <= y < b + 1
+  // Seems, this definition is not the same as in https://mathworld.wolfram.com/Half-GCD.html
+  // Note: for debugging it is useful to compare the quotients in the simple Euclidean algorithm vs the quotients there
+  // see helper64.js for the properties used
+
+  const size = a === 0n ? 0 : bitLength(a);
   const isSmall = size <= SUBQUADRATIC_HALFGCD_THRESHOLD;
+
   let [A, B, C, D] = [1n, 0n, 0n, 1n]; // 2x2 matrix
   let step = 0;
-  while (true) { // Q(T, a + 1n, b) === Q(T, a, b + 1n)
+  while (b !== 0n) {
     step += 1;
 
-    //console.assert(A * D >= 0 && B * C >= 0 && A * B <= 0 && D * C <= 0);//TODO: why - ?
-
-    // A*(X+Y) = A*X+A*Y
-    //const [a1, b1] = [a + A, b + C]; // T * (a_initial + 1n, b_initial);
-    //const [a2, b2] = [a + B, b + D]; // T * (a_initial, b_initial + 1n);
-    //if (!isSmall && n <= size * (2 / 3)) { // TODO: ?, the constant is based on some testing with some example
-    //  return [A, B, C, D, a, b];
-    //}
-    const m = BigInt(isSmall ? Math.max(0, bitLength2(a) - DIGITSIZE * (doubleDigitMethod ? 2 : 1)) : Math.floor(size / 2**step));
-    if (step !== 1/* && m1 < size / 2*/) {//?
-      if (((a + A) >> m) !== ((a + B) >> m) ||
-          ((b + C) >> m) !== ((b + D) >> m)) {
-        return [A, B, C, D, a, b];
+    if (!isSmall) {
+      const d = bitLength(abs(D));
+      const m = BigInt(Math.max(d, Math.ceil(size / 2) - d));
+      if (step !== 1) {
+        if (((a + A) >> m) !== ((a + B) >> m) ||
+            ((b + C) >> m) !== ((b + D) >> m)) {
+          // min and max values have different high bits
+          break;
+        }
       }
-    }
-    const [M0, M1, M2, M3, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, isSmall);
-    const A1 = BigInt(M0);
-    const B1 = BigInt(M1);
-    const C1 = BigInt(M2);
-    const D1 = BigInt(M3);
-    if (step === 1) {
-      [A, B, C, D] = [A1, B1, C1, D1];
-    } else {
-      // T = T1 * T:
-      const [M4, M5, M6, M7] = matrixMultiply(A1, B1, C1, D1, A, B, C, D);
-      A = BigInt(M4);
-      B = BigInt(M5);
-      C = BigInt(M6);
-      D = BigInt(M7);
+      const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> m, b >> m);
+      //console.assert(B1 !== 0n || (A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n));
+      if (B1 !== 0n) {
+        // T := T1 * T:
+        if (step === 1) {
+          [A, B, C, D] = [A1, B1, C1, D1];
+        } else {
+          [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, C1 * A + D1 * C, C1 * B + D1 * D];
+        }
+        const alo = BigInt.asUintN(Number(m), a);
+        const blo = BigInt.asUintN(Number(m), b);
+        // (a, b) := T1 * (alo, blo) + T1 * (ahi, bhi) * 2**m:
+        const a1 = (A1 * alo + B1 * blo) + (ahi1 << m);
+        const b1 = (C1 * alo + D1 * blo) + (bhi1 << m);
+        a = a1;
+        b = b1;
+        if (a < 0n || b < 0n) {
+          throw new TypeError("assertion");
+        }
+        continue;
+      }
     }
     if (isSmall) {
-      [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T1 * (a, b)
-    } else {
-      const alo = BigInt.asUintN(Number(m), a);
-      const blo = BigInt.asUintN(Number(m), b);
-      [a, b] = [(A1 * alo + B1 * blo) + (transformedAhi << m), (C1 * alo + D1 * blo) + (transformedBhi << m)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
-    }
-    console.assert(a > 0n && b >= 0n);
-    if (B1 === 0n) {
-      console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
-      if (b !== 0n) {//TODO: ?
-        const q = BigInt(a) / b;
-        const C2 = A - q * C, D2 = B - q * D, b1 = a - q * b;
-        const sameQuotient = b1 + C2 >= 0n && b1 + C2 < b + C &&
-                             b1 + D2 >= 0n && b1 + D2 < b + D;
-        if (!sameQuotient) {
-          return [A, B, C, D, a, b];
+      const m = BigInt(Math.max(0, bitLength2(a) - DIGITSIZE * (doubleDigitMethod ? 2 : 1)));
+      if (step !== 1) {
+        if (((a + A) >> m) !== ((a + B) >> m) ||
+            ((b + C) >> m) !== ((b + D) >> m)) {
+          // min and max values have different high bits
+          break;
         }
-        [A, B, C, D] = [C, D, C2, D2]; // {{0, 1}, {1, -q}} * T
-        [a, b] = [b, b1]; // {{0, 1}, {1, -q}} * (a, b)
-        //gcd.debug(q);
-      } else {
-        return [A, B, C, D, a, b];
+      }
+      const [A1, B1, C1, D1] = helper(a >> m, b >> m);
+      //console.assert(B1 !== 0n || (A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n));
+      if (B1 !== 0n) {
+        // T := T1 * T:
+        if (step === 1) {
+          [A, B, C, D] = [A1, B1, C1, D1];
+        } else {
+          [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, C1 * A + D1 * C, C1 * B + D1 * D];
+        }
+        // (a, b) := T1 * (a, b):
+        const a1 = A1 * a + B1 * b;
+        const b1 = C1 * a + D1 * b;
+        a = a1;
+        b = b1;
+        if (a < 0n || b < 0n) {
+          throw new TypeError("assertion");
+        }
+        continue;
       }
     }
+    const q = a / b;
+    const C1 = A - q * C;
+    const D1 = B - q * D;
+    const b1 = a - q * b;
+    const sameQuotient = 0n <= b1 + C1 && b1 + C1 < b + C &&
+                         0n <= b1 + D1 && b1 + D1 < b + D;
+    if (!sameQuotient) {
+      break;
+    }
+    // T := {{0, 1}, {1, -q}} * T:
+    [A, B, C, D] = [C, D, C1, D1];
+    // (a, b) := {{0, 1}, {1, -q}} * (a, b)
+    a = b;
+    b = b1;
+    //gcd.debug(q);
   }
   // see "2. General structure of subquadratic gcd algorithms" in “On Schönhage’s algorithm and subquadratic integer GCD computation” by Möller
   return [A, B, C, D, a, b]; // for performance transformedA and transformedB are returned
@@ -449,16 +471,23 @@ function LehmersGCD(a, b) {
   while (BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b) {
     //console.assert(a >= b);
     const n = bitLength(a);
-    const m = BigInt(Math.floor(n * 2 / 3)); // 2/3 is somehow faster
-    const [A1, B1, C1, D1, transformedAhi, transformedBhi] = halfgcd(a >> m, b >> m, false);
+    const m = BigInt(Math.floor(n * (2 / 3))); // 2/3 is somehow faster
+    const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> m, b >> m);
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       //gcd.debug(a / b);
-      [a, b] = [b, a % b];
+      const r = a % b;
+      a = b;
+      b = r;
+      //console.debug('%');
     } else {
       const alo = BigInt.asUintN(Number(m), a);
       const blo = BigInt.asUintN(Number(m), b);
-      [a, b] = [(A1 * alo + B1 * blo) + (transformedAhi << m), (C1 * alo + D1 * blo) + (transformedBhi << m)]; // T * (alo, blo) + T * (ahi, bhi) * 2**m
+      // (a, b) := T1 * (alo, blo) + T1 * (ahi, bhi) * 2**m:
+      const a1 = (A1 * alo + B1 * blo) + (ahi1 << m);
+      const b1 = (C1 * alo + D1 * blo) + (bhi1 << m);
+      a = a1;
+      b = b1;
       if (a < 0n || b < 0n) {
         throw new TypeError("assertion");
       }
@@ -468,24 +497,29 @@ function LehmersGCD(a, b) {
   // Lehmer's algorithm:
   while (b >= LEHMERS_ALGORITHM_THRESHOLD) {
     //console.assert(a >= b);
-    const n = bitLength2(a);
-    const m = Math.max(0, n - DIGITSIZE * (doubleDigitMethod ? 2 : 1));
+    const m = Math.max(0, bitLength2(a) - DIGITSIZE * (doubleDigitMethod ? 2 : 1));
     const [A1, B1, C1, D1] = helper((m === 0 ? a : a >> toBigInt(m)), (m === 0 ? b : b >> toBigInt(m)));
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       //gcd.debug(a / b);
-      [a, b] = [b, a % b];
+      const r = a % b;
+      a = b;
+      b = r;
       //console.debug('%');
     } else {
       if (LehmersGCD.progress != null) {
         LehmersGCD.progress.push(bitLength(b));
       }
-      [a, b] = [A1 * a + B1 * b, C1 * a + D1 * b]; // T * (a, b)
-      if (LehmersGCD.progress != null) {
-        LehmersGCD.progress.push(bitLength(b));
-      }
+      // (a, b) := T1 * (a, b):
+      const a1 = A1 * a + B1 * b;
+      const b1 = C1 * a + D1 * b;
+      a = a1;
+      b = b1;
       if (a < 0n || b < 0n) {
         throw new TypeError("assertion");
+      }
+      if (LehmersGCD.progress != null) {
+        LehmersGCD.progress.push(bitLength(b));
       }
     }
   }
