@@ -13,7 +13,7 @@ export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
   let i = 0;
 
   let bits = 0;
-  if (u64(y) != u64(0) && u64(x) != u64(-1)) { //! overflow when x == u64(-1)
+  if (u64(y) != u64(-1) && u64(x) != u64(-1)) { // overflow
     do {
       // switch from a matrix to pairs of (xmin,xmax) and (ymin,ymax):
       // any pair of initial integers looks like: (x_initial + alpha, y_initial + beta), where 0 <= alpha < 1 and 0 <= beta < 1
@@ -70,7 +70,7 @@ export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
       }
 
       // add more bits from xlo and ylo:
-      bits = i32(i64.clz(i64(u64(x + (i64(A) > i64(B) ? A : B))))); // xmax ?
+      bits = i32(i64.clz(i64(u64((u64(x + A) > u64(x + B) ? u64(x + A) : u64(x + B)))))); // xmax ?
       bits = i32(lobits) < i32(bits) ? lobits : bits;
       if (i32(bits) != i32(0)) {
         const s = i32(lobits - bits);

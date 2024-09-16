@@ -9,10 +9,10 @@ function randomBigInt(size, random = Math.random) {
   return (randomBigInt(size - q, random) << BigInt(q)) + randomBigInt(q, random);
 }
 
-function testRandomBigIntGCDPerformance() {
+function testRandomBigIntGCDPerformance(size) {
   // TODO: 30, 53
-  for (let size = 64; size <= 8 * 1024 * 1024; size *= 2) {
-    const e = 7 - Math.floor((Math.round(Math.log2(size)) - 3) / 3);
+  if (size <= 8 * 1024 * 1024) {
+    const e = 8 - Math.floor(Math.round(Math.log2(size)) / 3);
     const count = Math.pow(10, Math.max(e, 0));
     const a = new Array(count);
     const b = new Array(count);
@@ -29,12 +29,19 @@ function testRandomBigIntGCDPerformance() {
     const end = Date.now();
     //console.log(end - start, count);
     console.log(size, ((end - start) / count).toFixed(6) + "ms", sum);
+    const div = document.createElement('div');
+    div.textContent = size + ' ' + ((end - start) / count).toFixed(6) + "ms" + ' ' + sum;
+    document.body.appendChild(div);
+    window.requestIdleCallback(function () {
+      testRandomBigIntGCDPerformance(size * 2);
+    });
   }
 }
 
 setTimeout(() => {
-  testRandomBigIntGCDPerformance();
+  testRandomBigIntGCDPerformance(64);
 }, 10);
 
 </script>
-<p>See console.</p>
+<body>
+</body>
