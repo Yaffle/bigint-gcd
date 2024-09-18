@@ -1,181 +1,36 @@
 /*jshint esversion:11*/
 
-const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+const SUBQUADRATIC_GCD_THRESHOLD = 32 * 1024;
+const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
+const LEHMERS_ALGORITHM_THRESHOLD = 1n << 68n;
+const DOUBLE_DIGIT_METHOD = true;
 const U64_MAX = BigInt.asUintN(64, -1n);
+const F64_MAX = BigInt(9007199254740992); // 2**53
 
-//TODO: https://en.wikipedia.org/wiki/Euclidean_algorithm#Method_of_least_absolute_remainders
-function numbersGCD(a, b) {
-  while (b > 0) {
-    const q = Math.floor(a / b);
-    const r = a - q * b;
-    a = b;
-    b = r;
-  }
-  return a;
-}
-
-/*
-
-export function gcd(a:u64, b:u64):u64 {
-  if (b !== 0) {
-    do {
-      const r = a % b;
-      a = b;
-      b = r;
-    } while (b !== 0);
-  }
-  return a;
-}
-
-*/
-
-let i64gcd = null;
-if (globalThis.WebAssembly != null) {
-  const i64gcdCode = new Uint8Array([0,97,115,109,1,0,0,0,1,7,1,96,2,126,126,1,126,3,2,1,0,7,7,1,3,103,99,100,0,0,10,39,1,37,1,1,126,32,1,66,0,82,4,64,3,64,32,0,32,1,130,33,2,32,1,33,0,32,2,34,1,66,0,82,13,0,11,11,32,0,11]);
-  try {
-    const f = new WebAssembly.Instance(new WebAssembly.Module(i64gcdCode)).exports.gcd;
-    if (f(BigInt(0), BigInt(0)) === BigInt(0)) {
-      i64gcd = f;
-    }
-  } catch (error) {
-    console.log(error);
-  }
-}
-
-function EuclidsGCD(a, b) {
-  if (typeof a !== 'bigint' || typeof b !== 'bigint') {
-    throw new TypeError();
-  }
-  const M = i64gcd != null ? U64_MAX : MAX_SAFE_INTEGER;
-  while (b > M) {
-    const r = a % b;
-    a = b;
-    b = r;
-  }
-  if (b > 0n) {
-    if (a > M) {
-      const r = a % b;
-      a = b;
-      b = r;
-    }
-    if (i64gcd != null) {
-      return BigInt.asUintN(64, i64gcd(a, b));
-    }
-    return BigInt(numbersGCD(Number(a), Number(b)));
-  }
-  return a;
-}
-
-// https://github.com/tc39/proposal-bigint/issues/205
-// https://github.com/tc39/ecma262/issues/1729
-// floor(log2(a)) + 1 if a > 0
-function bitLength(a) {
-  const s = a.toString(16);
-  const c = s.charCodeAt(0) - 0 - '0'.charCodeAt(0);
-  if (c <= 0) {
-    throw new RangeError();
-  }
-  return (s.length - 1) * 4 + (32 - Math.clz32(Math.min(c, 8)));
-}
-
-// 1 + floor(log2(x))
-function log2(x) {
-  let e = 0;
-  while (x > (1 << 30)) {
-    x = Math.floor(x / (1 << 30));
-    e += 30;
-  }
-  e += (32 - Math.clz32(x));
-  return e;
-}
-
-let DIGITSIZE = 53;
-const doubleDigitMethod = true;
-
+let DIGITSIZE = 0;
+let u64gcd = null;
 let wasmHelper = null;
-if (true && globalThis.WebAssembly != null) {
-  const wasmCode2 = new Uint8Array([0,97,115,109,1,0,0,0,1,14,2,96,0,1,126,96,5,126,126,126,126,127,1,127,3,6,5,1,0,0,0,0,6,21,4,126,1,66,0,11,126,1,66,0,11,126,1,66,0,11,126,1,66,0,11,7,26,5,6,104,101,108,112,101,114,0,0,1,65,0,1,1,66,0,2,1,67,0,3,1,68,0,4,10,254,2,5,231,2,2,7,126,2,127,66,1,33,7,66,1,33,8,32,0,66,127,82,32,2,66,127,82,113,4,64,3,64,32,0,32,6,124,33,6,32,0,32,7,124,33,7,32,2,32,5,124,33,5,32,2,32,8,124,33,8,32,12,65,1,113,4,64,32,6,33,9,32,7,33,6,32,9,33,7,32,5,33,9,32,8,33,5,32,9,33,8,11,3,64,32,5,32,7,32,6,32,8,128,34,11,32,5,126,125,34,9,86,4,64,32,12,65,1,106,33,12,32,6,32,8,32,11,126,125,33,10,32,0,32,2,32,11,126,125,33,11,32,5,33,6,32,8,33,7,32,2,33,0,32,10,33,5,32,9,33,8,32,11,33,2,12,1,11,11,32,7,32,0,125,33,7,32,6,32,0,125,33,6,32,5,32,2,125,33,5,32,8,32,2,125,33,8,32,12,65,1,113,4,64,32,7,33,9,32,6,33,7,32,9,33,6,32,5,33,9,32,8,33,5,32,9,33,8,11,32,4,32,0,32,7,32,6,32,6,32,7,83,27,124,121,167,34,13,32,4,32,13,72,27,34,13,4,64,32,1,32,1,32,4,32,13,107,34,4,172,34,9,136,34,10,32,9,134,125,33,1,32,3,32,3,32,9,136,34,11,32,9,134,125,33,3,32,7,32,10,126,32,6,32,11,126,124,32,0,32,13,172,34,9,134,124,33,0,32,5,32,10,126,32,8,32,11,126,124,32,2,32,9,134,124,33,2,11,32,13,13,0,11,11,32,7,36,0,32,6,36,1,32,5,36,2,32,8,36,3,65,0,11,4,0,35,0,11,4,0,35,1,11,4,0,35,2,11,4,0,35,3,11]);
+let f64gcd = null;
+let jsHelper = null;
+
+if (true && typeof WebAssembly !== 'undefined') {
+  const wasmCode = new Uint8Array([0,97,115,109,1,0,0,0,1,20,3,96,0,1,126,96,2,126,126,1,126,96,5,126,126,126,126,127,1,127,3,7,6,1,2,0,0,0,0,6,21,4,126,1,66,0,11,126,1,66,0,11,126,1,66,0,11,126,1,66,0,11,7,35,6,6,117,54,52,103,99,100,0,0,6,104,101,108,112,101,114,0,1,1,65,0,2,1,66,0,3,1,67,0,4,1,68,0,5,10,171,3,6,37,1,1,126,32,1,66,0,82,4,64,3,64,32,0,32,1,130,33,2,32,1,33,0,32,2,34,1,66,0,82,13,0,11,11,32,0,11,238,2,2,7,126,2,127,66,1,33,9,66,1,33,7,32,0,66,127,82,32,2,66,127,82,113,4,64,3,64,32,0,32,6,124,33,8,32,0,32,9,124,33,6,32,2,32,5,124,33,5,32,2,32,7,124,33,7,32,12,65,1,113,4,64,32,8,33,9,32,6,33,8,32,9,33,6,32,5,33,9,32,7,33,5,32,9,33,7,11,3,64,32,5,32,6,32,8,32,7,128,34,11,32,5,126,125,34,9,86,4,64,32,12,65,1,106,33,12,32,8,32,7,32,11,126,125,33,10,32,0,32,2,32,11,126,125,33,11,32,5,33,8,32,7,33,6,32,2,33,0,32,10,33,5,32,9,33,7,32,11,33,2,12,1,11,11,32,6,32,0,125,33,9,32,8,32,0,125,33,6,32,5,32,2,125,33,5,32,7,32,2,125,33,7,32,12,65,1,113,4,64,32,9,33,8,32,6,33,9,32,8,33,6,32,5,33,8,32,7,33,5,32,8,33,7,11,32,4,32,0,32,9,124,34,8,32,0,32,6,124,34,10,32,8,32,10,86,27,121,167,34,13,32,4,32,13,72,27,34,13,4,64,32,1,32,1,32,4,32,13,107,34,4,172,34,8,136,34,10,32,8,134,125,33,1,32,3,32,3,32,8,136,34,11,32,8,134,125,33,3,32,9,32,10,126,32,6,32,11,126,124,32,0,32,13,172,34,8,134,124,33,0,32,5,32,10,126,32,7,32,11,126,124,32,2,32,8,134,124,33,2,11,32,13,13,0,11,11,32,9,36,0,32,6,36,1,32,5,36,2,32,7,36,3,65,0,11,4,0,35,0,11,4,0,35,1,11,4,0,35,2,11,4,0,35,3,11]);
   try {
-    const exports = new WebAssembly.Instance(new WebAssembly.Module(wasmCode2)).exports;
-    if (exports.helper(BigInt(1), BigInt(0), BigInt(1), BigInt(0)) != null) {
+    const exports = new WebAssembly.Instance(new WebAssembly.Module(wasmCode)).exports;
+    if (exports.helper(1n, 0n, 1n, 0n) != null) {
       wasmHelper = function (x, xlo, y, ylo, lobits) {
         exports.helper(x, xlo, y, ylo, lobits);
         return [exports.A(), exports.B(), exports.C(), exports.D()];
       };
       DIGITSIZE = 64;
     }
+    if (exports.u64gcd(0n, 0n) === 0n) {
+      u64gcd = exports.u64gcd;
+    }
   } catch (error) {
     console.log(error);
   }
 }
-
-
-const frexpf64 = typeof Float64Array !== 'undefined' ? new Float64Array(1) : null;
-const frexpi32 = typeof Float64Array !== 'undefined' ? new Int32Array(frexpf64.buffer) : null;
-
-let previousValue = 0;
-// some terrible optimization as bitLength is slow
-function bitLength2(a) {
-  if (previousValue <= 1024) {
-    const n = Number(BigInt(a));
-    if (frexpf64 != null) {
-      frexpf64[0] = n;
-      const e = (frexpi32[1] >> 20) - 1023;
-      if (e < 1024 && frexpi32[0] !== 0 || (frexpi32[1] & 0xFFFFF) !== 0) {
-        previousValue = e + 1;
-        return previousValue;
-      }
-    }
-    const x = Math.log2(n) + 1024 * 4 - 1024 * 4;
-    const y = Math.ceil(x);
-    if (x !== y) {
-      previousValue = y;
-      return previousValue;
-    }
-  }
-  if (previousValue < DIGITSIZE) {
-    previousValue = DIGITSIZE;
-  }
-  const n = Number(a >> BigInt(previousValue - DIGITSIZE));
-  if (n >= 1 && n <= Number.MAX_SAFE_INTEGER) {
-    previousValue = previousValue - DIGITSIZE + log2(n);
-    return previousValue;
-  }
-  previousValue = bitLength(a);
-  return previousValue;
-}
-
-
-function helper(X, Y) {
-  if (typeof X !== 'bigint' || typeof Y !== 'bigint') {
-    throw new TypeError();
-  }
-  if (!doubleDigitMethod) {
-    if (wasmHelper != null) {
-      return wasmHelper(X, 0n, Y, 0n, 0);
-    }
-    return jsHelper(X, 0n, Y, 0n, 0);
-  }
-  if (wasmHelper != null) {
-    if (DIGITSIZE !== 64) {
-      throw new RangeError();
-    }
-    const x = BigInt.asUintN(64, X >> 64n);
-    const xlo = BigInt.asUintN(64, X);
-    const y = BigInt.asUintN(64, Y >> 64n);
-    const ylo = BigInt.asUintN(64, Y);
-    return wasmHelper(x, xlo, y, ylo, 64);
-  }
-  if (DIGITSIZE !== 53) {
-    throw new RangeError();
-  }
-  const x = X >> 53n;
-  const xlo = BigInt.asUintN(53, X);
-  const y = Y >> 53n;
-  const ylo = BigInt.asUintN(53, Y);
-  return jsHelper(x, xlo, y, ylo, 53);
-}
-
 
 
 function AsmModule(stdlib) {
@@ -190,6 +45,17 @@ function AsmModule(stdlib) {
   var gC = 0.0;
   var gD = 0.0;
 
+function f64gcd(a, b) {
+  a = +a;
+  b = +b;
+  var r = 0.0;
+  while (b > 0.0) {
+    r = a - +floor(a / b) * b;
+    a = b;
+    b = r;
+  }
+  return a;
+}
 
 // 1 + floor(log2(x))
 function log2(x) {
@@ -219,7 +85,6 @@ function exp2(n) {
   return +result;
 }
 
-
 // @Deprecated, see helper64.js
 function jsHelper(x, xlo, y, ylo, lobits) {
   x = +x;
@@ -228,11 +93,6 @@ function jsHelper(x, xlo, y, ylo, lobits) {
   ylo = +ylo;
   lobits = lobits | 0;
 
-  // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q_i}} matrices,
-  // where q_i are the quotients produced by Euclidean algorithm for any pair of integers (a, b),
-  // where a within [x, x + 1] and b within [y, y + 1]
-
-  // 2x2-matrix transformation matrix of (x_initial, y_initial) into (x, y):
   var A = 1.0;
   var B = 0.0;
   var C = 0.0;
@@ -255,14 +115,13 @@ function jsHelper(x, xlo, y, ylo, lobits) {
   if (y != 0.0) {
     do {
       do {
-        //console.assert(y > 0);
         q = floor(x / y);
         y1 = x - q * y;
-        // Multiply matrix augmented by column (x, y) by {{0, 1}, {1, -q}} from the right:
         A1 = C;
         B1 = D;
         C1 = A - q * C;
         D1 = B - q * D;
+
         // The quotient for a point (x_initial + alpha, y_initial + beta), where 0 <= alpha < 1 and 0 <= beta < 1:
         // floor((x + A * alpha + B * beta) / (y + C * alpha + D * beta))
         // As the sign(A) === -sign(B) === -sign(C) === sign(D) (ignoring zero entries) the maximum and minimum values are floor((x + A) / (y + C)) and floor((x + B) / (y + D))
@@ -271,8 +130,6 @@ function jsHelper(x, xlo, y, ylo, lobits) {
         // floor((x + B) / (y + D)) === q  <=>  0 <= (x + B) - q * (y + D) < (y + D)  <=>  0 <= y1 + D1 < y + D
         sameQuotient = (0.0 <= y1 + C1) & (y1 + C1 < y + C) &
                        (0.0 <= y1 + D1) & (y1 + D1 < y + D);
-        //sameQuotient = C1 < 0 && -C1 <= y1 && D1 - D < y - y1 ||
-        //               D1 < 0 && -D1 <= y1 && C1 - C < y - y1;
         if (sameQuotient) {
           x = y;
           y = y1;
@@ -280,7 +137,6 @@ function jsHelper(x, xlo, y, ylo, lobits) {
           B = B1;
           C = C1;
           D = D1;
-          //gcd.debug(q);
         }
       } while (sameQuotient);
 
@@ -321,18 +177,144 @@ function jsHelper(x, xlo, y, ylo, lobits) {
     return gD;
   }
 
-  return {helper: jsHelper, A: A, B: B, C: C, D: D};
+  return {f64gcd: f64gcd, helper: jsHelper, A: A, B: B, C: C, D: D};
 }
 
-const asmExports = wasmHelper == null ? AsmModule(globalThis) : null;
-const jsHelper = function (x, xlo, y, ylo, lobits) {
-  asmExports.helper(Number(BigInt(x)), Number(BigInt(xlo)), Number(BigInt(y)), Number(BigInt(ylo)), lobits);
-  return [BigInt(asmExports.A()), BigInt(asmExports.B()), BigInt(asmExports.C()), BigInt(asmExports.D())];
-};
+if (DIGITSIZE === 0) {
+  const asmExports = AsmModule(globalThis);
+  jsHelper = function (x, xlo, y, ylo, lobits) {
+    asmExports.helper(x, xlo, y, ylo, lobits);
+    return [BigInt(asmExports.A()), BigInt(asmExports.B()), BigInt(asmExports.C()), BigInt(asmExports.D())];
+  };
+  DIGITSIZE = 53;
+  f64gcd = asmExports.f64gcd;
+}
 
+// https://github.com/tc39/proposal-bigint/issues/205
+// https://github.com/tc39/ecma262/issues/1729
+// floor(log2(a)) + 1 if a > 0
+function bitLength(a) {
+  const s = a.toString(16);
+  const c = s.charCodeAt(0) - 0 - '0'.charCodeAt(0);
+  if (c <= 0) {
+    throw new RangeError();
+  }
+  return (s.length - 1) * 4 + (32 - Math.clz32(Math.min(c, 8)));
+}
 
+const frexpf64 = typeof Float64Array !== 'undefined' ? new Float64Array(1) : null;
+const frexpi32 = typeof Float64Array !== 'undefined' ? new Int32Array(frexpf64.buffer) : null;
 
-const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
+let previousValue = 0;
+// some terrible optimization as bitLength is slow
+function bitLength2(a) {
+  if (previousValue <= 1024) {
+    const n = Number(BigInt(a));
+    if (frexpf64 != null) {
+      frexpf64[0] = n;
+      const e = (frexpi32[1] >> 20) - 1023;
+      if (e < 1024 && frexpi32[0] !== 0 || (frexpi32[1] & 0xFFFFF) !== 0) {
+        previousValue = e + 1;
+        return previousValue;
+      }
+    }
+    const x = Math.log2(n) + 1024 * 4 - 1024 * 4;
+    const y = Math.ceil(x);
+    if (x !== y) {
+      previousValue = y;
+      return previousValue;
+    }
+  }
+  if (previousValue < DIGITSIZE) {
+    previousValue = DIGITSIZE;
+  }
+  const n = Number(a >> BigInt(previousValue - DIGITSIZE));
+  if (n >= 1 && n <= 9007199254740992) { // 2**53
+    let x = +n;
+    let e = 0;
+    while (x > +(1 << 30)) {
+      x = Math.floor(x / +(1 << 30));
+      e += 30;
+    }
+    e += (32 - Math.clz32(x));
+    previousValue = previousValue - DIGITSIZE + e;
+    return previousValue;
+  }
+  previousValue = bitLength(a);
+  return previousValue;
+}
+
+function abs(a) {
+  return a < 0n ? -a : a;
+}
+
+function EuclidsGCD(a, b) {
+  if (typeof a !== 'bigint' || typeof b !== 'bigint') {
+    throw new TypeError();
+  }
+  if (u64gcd != null) {
+    while (b > U64_MAX) {
+      const r = a % b;
+      a = b;
+      b = r;
+    }
+    if (b === 0n) {
+      return a;
+    }
+    if (a > U64_MAX) {
+      const r = a % b;
+      a = b;
+      b = r;
+    }
+    return BigInt.asUintN(64, u64gcd(a, b));
+  } else {
+    while (b > F64_MAX) {
+      const r = a % b;
+      a = b;
+      b = r;
+    }
+    if (b === 0n) {
+      return a;
+    }
+    if (a > F64_MAX) {
+      const r = a % b;
+      a = b;
+      b = r;
+    }
+    return BigInt(f64gcd(Number(a), Number(b)));
+  }
+}
+
+function helper(X, Y) {
+  if (typeof X !== 'bigint' || typeof Y !== 'bigint') {
+    throw new TypeError();
+  }
+  if (wasmHelper != null) {
+    if (DIGITSIZE !== 64) {
+      throw new RangeError();
+    }
+    if (!DOUBLE_DIGIT_METHOD) {
+      return wasmHelper(X, 0n, Y, 0n, 0);
+    }
+    const x = BigInt.asUintN(64, X >> 64n);
+    const xlo = BigInt.asUintN(64, X);
+    const y = BigInt.asUintN(64, Y >> 64n);
+    const ylo = BigInt.asUintN(64, Y);
+    return wasmHelper(x, xlo, y, ylo, 64);
+  } else {
+    if (DIGITSIZE !== 53) {
+      throw new RangeError();
+    }
+    if (!DOUBLE_DIGIT_METHOD) {
+      return jsHelper(Number(X), 0, Number(Y), 0, 0);
+    }
+    const x = Number(X >> 53n);
+    const xlo = Number(BigInt.asUintN(53, X));
+    const y = Number(Y >> 53n);
+    const ylo = Number(BigInt.asUintN(53, Y));
+    return jsHelper(x, xlo, y, ylo, 53);
+  }
+}
 
 //TODO: remove those comments:
   // floor((a + 1) / b) < q = floor(a / b) < floor(a / (b + 1))
@@ -365,16 +347,17 @@ function halfgcd(a, b) {
 
     if (!isSmall) {
       const d = bitLength(abs(D));
-      const m = BigInt(Math.max(0, Math.ceil(size / 2) - d));
+      const m = Math.max(0, Math.ceil(size / 2) - d);
+      const M = BigInt(m);
       if (step !== 1) {
-        if (((a + A) >> m) !== ((a + B) >> m) ||
-            ((b + C) >> m) !== ((b + D) >> m)) {
+        if (((a + A) >> M) !== ((a + B) >> M) ||
+            ((b + C) >> M) !== ((b + D) >> M)) {
           // min and max values have different high bits
           isSmall = true;
           continue;
         }
       }
-      const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> m, b >> m);
+      const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> M, b >> M);
       //console.assert(B1 !== 0n || (A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n));
       if (B1 !== 0n) {
         // T := T1 * T:
@@ -383,11 +366,11 @@ function halfgcd(a, b) {
         } else {
           [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, C1 * A + D1 * C, C1 * B + D1 * D];
         }
-        const alo = BigInt.asUintN(Number(m), a);
-        const blo = BigInt.asUintN(Number(m), b);
+        const alo = BigInt.asUintN(m, a);
+        const blo = BigInt.asUintN(m, b);
         // (a, b) := T1 * (alo, blo) + T1 * (ahi, bhi) * 2**m:
-        const a1 = (A1 * alo + B1 * blo) + (ahi1 << m);
-        const b1 = (C1 * alo + D1 * blo) + (bhi1 << m);
+        const a1 = (A1 * alo + B1 * blo) + (ahi1 << M);
+        const b1 = (C1 * alo + D1 * blo) + (bhi1 << M);
         a = a1;
         b = b1;
         if (a < 0n || b < 0n) {
@@ -397,7 +380,7 @@ function halfgcd(a, b) {
       }
     }
     if (isSmall) {
-      const m = BigInt(Math.max(0, bitLength2(a) - DIGITSIZE * (doubleDigitMethod ? 2 : 1)));
+      const m = BigInt(Math.max(0, bitLength2(a) - DIGITSIZE * (DOUBLE_DIGIT_METHOD ? 2 : 1)));
       if (step !== 1) {
         if (((a + A) >> m) !== ((a + B) >> m) ||
             ((b + C) >> m) !== ((b + D) >> m)) {
@@ -445,22 +428,8 @@ function halfgcd(a, b) {
   return [A, B, C, D, a, b]; // for performance transformedA and transformedB are returned
 }
 
-const SUBQUADRATIC_GCD_THRESHOLD = (32 * 1024);
-const LEHMERS_ALGORITHM_THRESHOLD = BigInt(2**68);
-
-const toBigIntu64 = typeof BigUint64Array !== 'undefined' ? new BigUint64Array(1) : null;
-const toBigInti32 = typeof BigUint64Array !== 'undefined' ? new Int32Array(toBigIntu64.buffer) : null;
-const toBigInt = function (i) {
-  if (toBigIntu64 != null) {
-    toBigInti32[0] = i;
-    return toBigIntu64[0];
-  }
-  return BigInt(i);
-};
-
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
-// this implementation is good after ~80 bits (?)
 function LehmersGCD(a, b) {
   if (a < b) {
     const tmp = a;
@@ -472,21 +441,21 @@ function LehmersGCD(a, b) {
   while (BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) < b) {
     //console.assert(a >= b);
     const n = bitLength(a);
-    const m = BigInt(Math.floor(n * (2 / 3))); // 2/3 is somehow faster
-    const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> m, b >> m);
+    const m = Math.floor(n * (2 / 3)); // 2/3 is somehow faster
+    const M = BigInt(m);
+    const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> M, b >> M);
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
-      //gcd.debug(a / b);
       const r = a % b;
       a = b;
       b = r;
       //console.debug('%');
     } else {
-      const alo = BigInt.asUintN(Number(m), a);
-      const blo = BigInt.asUintN(Number(m), b);
+      const alo = BigInt.asUintN(m, a);
+      const blo = BigInt.asUintN(m, b);
       // (a, b) := T1 * (alo, blo) + T1 * (ahi, bhi) * 2**m:
-      const a1 = (A1 * alo + B1 * blo) + (ahi1 << m);
-      const b1 = (C1 * alo + D1 * blo) + (bhi1 << m);
+      const a1 = (A1 * alo + B1 * blo) + (ahi1 << M);
+      const b1 = (C1 * alo + D1 * blo) + (bhi1 << M);
       a = a1;
       b = b1;
       if (a < 0n || b < 0n) {
@@ -498,19 +467,16 @@ function LehmersGCD(a, b) {
   // Lehmer's algorithm:
   while (b >= LEHMERS_ALGORITHM_THRESHOLD) {
     //console.assert(a >= b);
-    const m = Math.max(0, bitLength2(a) - DIGITSIZE * (doubleDigitMethod ? 2 : 1));
-    const [A1, B1, C1, D1] = helper((m === 0 ? a : a >> toBigInt(m)), (m === 0 ? b : b >> toBigInt(m)));
+    const m = Math.max(0, bitLength2(a) - DIGITSIZE * (DOUBLE_DIGIT_METHOD ? 2 : 1));
+    const M = m === 0 ? 0n : BigInt(m);
+    const [A1, B1, C1, D1] = helper((m === 0 ? a : a >> M), (m === 0 ? b : b >> M));
     if (B1 === 0n) {
       //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
-      //gcd.debug(a / b);
       const r = a % b;
       a = b;
       b = r;
       //console.debug('%');
     } else {
-      if (LehmersGCD.progress != null) {
-        LehmersGCD.progress.push(bitLength(b));
-      }
       // (a, b) := T1 * (a, b):
       const a1 = A1 * a + B1 * b;
       const b1 = C1 * a + D1 * b;
@@ -519,100 +485,65 @@ function LehmersGCD(a, b) {
       if (a < 0n || b < 0n) {
         throw new TypeError("assertion");
       }
-      if (LehmersGCD.progress != null) {
-        LehmersGCD.progress.push(bitLength(b));
-      }
     }
   }
 
   return EuclidsGCD(a, b);
 }
 
-
-function abs(a) {
-  return a < 0n ? -a : a;
-}
-
-function numberCTZ(a) {
-  return 32 - (Math.clz32(a & -a) + 1);
-}
-function ctz(a) {
-  const test = BigInt.asUintN(32, a);
-  if (test !== 0n) {
-    return numberCTZ(Number(test));
-  }
-  let k = 32;
-  while (BigInt.asUintN(k, a) === 0n) {
-    k *= 2;
-  }
-  let n = 0;
-  for (let i = Math.floor(k / 2); i >= 32; i = Math.floor(i / 2)) {
-    if (BigInt.asUintN(i, a) === 0n) {
-      n += i;
-      a >>= BigInt(i);
-    } else {
-      a = BigInt.asUintN(i, a);
-    }
-  }
-  n += numberCTZ(Number(BigInt(BigInt.asUintN(32, a))));
-  return n;
-}
-
-function bigIntGCD(a, b) {
+function gcd(a, b) {
   const A = abs(BigInt(a));
   const B = abs(BigInt(b));
-
-  if (i64gcd == null) {
-    const na = Number(A);
-    const nb = Number(B);
-    if (Math.max(na, nb) <= Number.MAX_SAFE_INTEGER) {
-      return BigInt(numbersGCD(na, nb));
-    }
-    const abmin = Math.min(na, nb);
-    if (abmin <= Number.MAX_SAFE_INTEGER) {
-      if (abmin === 0) {
-        return A + B;
-      }
-      if (abmin === 1) {
-        return 1n;
-      }
-      return BigInt(numbersGCD(abmin, Math.abs(Number(na < nb ? B % A : A % B))));
-    }
-  }
-  if (i64gcd != null) {
-    const isASmall = BigInt.asUintN(64, A) === A;
-    const isBSmall = BigInt.asUintN(64, B) === B;
+  if (u64gcd != null) {
+    const isASmall = A <= U64_MAX;
+    const isBSmall = B <= U64_MAX;
     if (isASmall && isBSmall) {
-      return BigInt.asUintN(64, i64gcd(A, B));
-    } else if (isASmall || isBSmall) {
+      return BigInt.asUintN(64, u64gcd(A, B));
+    } else if (isASmall) {
       if (A === 0n) {
         return B;
-      }
-      if (B === 0n) {
-        return A;
       }
       if (A === 1n) {
         return 1n;
       }
+      return BigInt.asUintN(64, u64gcd(A, B % A));
+    } else if (isBSmall) {
+      if (B === 0n) {
+        return A;
+      }
       if (B === 1n) {
         return 1n;
       }
-      return BigInt.asUintN(64, i64gcd(isASmall ? A : A % B, isBSmall ? B : B % A));
+      return BigInt.asUintN(64, u64gcd(A % B, B));
     }
-  }
-  if (true) {
-    const c1 = ctz(A);
-    const c2 = ctz(B);
-    if (c1 + c2 >= 4) {
-      const g = LehmersGCD(c1 === 0 ? A : A >> BigInt(c1), c2 === 0 ? B : B >> BigInt(c2));
-      const c = Math.min(c1, c2);
-      return c === 0 ? g : (BigInt(g) << BigInt(c));
+  } else {
+    const na = Number(A);
+    const nb = Number(B);
+    const isASmall = Math.abs(na) < 9007199254740992; // 2**53
+    const isBSmall = Math.abs(nb) < 9007199254740992; // 2**53
+    if (isASmall && isBSmall) {
+      return BigInt(f64gcd(na, nb));
+    } else if (isASmall) {
+      if (na === 0) {
+        return B;
+      }
+      if (na === 1) {
+        return 1n;
+      }
+      return BigInt(f64gcd(na, Number(B % A)));
+    } else if (isBSmall) {
+      if (nb === 0) {
+        return A;
+      }
+      if (nb === 1) {
+        return 1n;
+      }
+      return BigInt(f64gcd(Number(A % B), nb));
     }
   }
   return LehmersGCD(A, B);
 }
 
-export default bigIntGCD;
-//globalThis.bigIntGCD = bigIntGCD;
+export default gcd;
 
-bigIntGCD.halfgcd = halfgcd;//TODO:
+gcd.halfgcd = halfgcd;//TODO:

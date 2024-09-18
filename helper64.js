@@ -1,4 +1,15 @@
 
+export function u64gcd(a:u64, b:u64):u64 {
+  if (b !== 0) {
+    do {
+      const r = a % b;
+      a = b;
+      b = r;
+    } while (b !== 0);
+  }
+  return a;
+}
+
 export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
   // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q_i}} matrices,
   // where q_i are the quotients produced by Euclidean algorithm for any pair of integers (a, b),
