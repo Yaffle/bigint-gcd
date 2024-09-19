@@ -10,6 +10,30 @@ export function u64gcd(a:u64, b:u64):u64 {
   return a;
 }
 
+export function u64gcdext(a:u64, b:u64):u64 {
+  let A = i64(1);
+  let B = i64(0);
+  let C = i64(0);
+  let D = i64(1);
+  if (b !== 0) {
+    do {
+      const q = a / b;
+      const b1 = a - q * b;
+      a = b;
+      b = b1;
+      const C1 = i64(A - i64(q * C));
+      const D1 = i64(B - i64(q * D));
+      A = C;
+      B = D;
+      C = C1;
+      D = D1;
+    } while (b !== 0);
+  }
+  gA = A;
+  gB = B;
+  return a;
+}
+
 export function helper(x:u64, xlo:u64, y:u64, ylo:u64, lobits:i32):i32 {
   // computes the transformation matrix, which is the product of all {{0, 1}, {1, -q_i}} matrices,
   // where q_i are the quotients produced by Euclidean algorithm for any pair of integers (a, b),
