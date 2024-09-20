@@ -7,11 +7,10 @@ const DOUBLE_DIGIT_METHOD = true;
 let SMALL_GCD_MAX = 0n;
 let DIGITSIZE = 0;
 
-let u64gcd = null;
-let u64gcdext = null;
+let smallgcd = null;
+let smallgcdext = null;
+
 let wasmHelper = null;
-let f64gcd = null;
-let f64gcdext = null;
 let jsHelper = null;
 
 if (true && typeof WebAssembly !== 'undefined') {
@@ -27,10 +26,10 @@ if (true && typeof WebAssembly !== 'undefined') {
       SMALL_GCD_MAX = BigInt.asUintN(64, -1n);
     }
     if (exports.u64gcd(0n, 0n) === 0n) {
-      u64gcd = exports.u64gcd;
+      smallgcd = exports.u64gcd;
     }
     if (exports.u64gcdext(0n, 0n) === 0n) {
-      u64gcdext = function (a, b) {
+      smallgcdext = function (a, b) {
         const g = exports.u64gcdext(a, b);
         return [exports.A(), exports.B(), g];
       };
@@ -215,7 +214,7 @@ function jsHelper(x, xlo, y, ylo, lobits) {
     return gD;
   }
 
-  return {f64gcd: f64gcd, helper: jsHelper, A: A, B: B, C: C, D: D};
+  return {f64gcdext: f64gcdext, f64gcd: f64gcd, helper: jsHelper, A: A, B: B, C: C, D: D};
 }
 
 if (DIGITSIZE === 0) {
@@ -225,9 +224,14 @@ if (DIGITSIZE === 0) {
     return [BigInt(asmExports.A()), BigInt(asmExports.B()), BigInt(asmExports.C()), BigInt(asmExports.D())];
   };
   DIGITSIZE = 53;
-  SMALL_GCD_MAX = BigInt.asUintN(53, -1);
-  f64gcd = asmExports.f64gcd;
-  f64gcdext = asmExports.f64gcdext;
+  SMALL_GCD_MAX = BigInt.asUintN(53, -1n);
+  smallgcd = function (a, b) {
+    return BigInt(asmExports.f64gcd(Number(BigInt(a)), Number(BigInt(b))));
+  };
+  smallgcdext =  function (a, b) {
+    const g = asmExports.f64gcdext(Number(BigInt(a)), Number(BigInt(b)));
+    return [BigInt(asmExports.A()), BigInt(asmExports.B()), BigInt(g)];
+  };
 }
 
 // https://github.com/tc39/proposal-bigint/issues/205
@@ -481,15 +485,11 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
 function LehmersGCD(a, b) {
-  let [A, B, C, D, a1, b1] = halfgcd(a, b, false, false);
+  const [A, B, C, D, a1, b1] = halfgcd(a, b, false, false);
   a = a1;
   b = b1;
   if (b !== 0n) {
-    if (u64gcd != null) {
-      a = BigInt.asUintN(64, u64gcd(a, b));
-    } else {
-      a = BigInt(f64gcd(-0.0 + Number(BigInt(a)), -0.0 + Number(BigInt(b))));
-    }
+    a = BigInt.asUintN(64, smallgcd(a, b));
   }
   return a;
 }
@@ -499,17 +499,10 @@ function LehmersGCDExt(a, b) {
   a = a1;
   b = b1;
   if (b !== 0n) {
-    if (u64gcdext != null) {
-      const [A1, B1, g] = u64gcdext(a, b);
-      a = BigInt.asUintN(64, g);
-      b = 0n;
-      [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, 0n, 0n];
-    } else {
-      const [A1, B1, g] = f64gcdext(-0.0 + Number(BigInt(a)), -0.0 + Number(BigInt(b)));
-      a = BigInt(g);
-      b = 0n;
-      [A, B, C, D] = [BigInt(A1) * A + BigInt(B1) * C, BigInt(A1) * B + BigInt(B1) * D, 0n, 0n];
-    }
+    const [A1, B1, g] = smallgcdext(a, b);
+    a = BigInt.asUintN(64, g);
+    b = 0n;
+    [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, 0n, 0n];
   }
   return [A, B, a];
 }
@@ -522,7 +515,32 @@ function gcdext(a, b) {
   return LehmersGCDExt(BigInt(a), BigInt(b));
 }
 
+function halfgcdWrapper(a, b) {
+  let [A, B, C, D, a1, b1] = halfgcd(a, b);
+  a = a1;
+  b = b1;
+  // reduce numbers as much as possible:
+  while (b !== 0n) {
+    const q = a / b;
+    const b1 = a - q * b;
+    const C1 = A - q * C;
+    const D1 = B - q * D;
+    const sameQuotient = 0n <= b1 + C1 && b1 + C1 < b + C &&
+                         0n <= b1 + D1 && b1 + D1 < b + D;
+    if (!sameQuotient) {
+      break;
+    }
+    // T := {{0, 1}, {1, -q}} * T:
+    [A, B, C, D] = [C, D, C1, D1];
+    // (a, b) := {{0, 1}, {1, -q}} * (a, b)
+    a = b;
+    b = b1;
+    //gcd.debug(q);
+  }
+  return [A, B, C, D, a, b];
+}
+
 export default gcd;
 
-gcd.halfgcd = halfgcd;//TODO:?
+gcd.halfgcd = halfgcdWrapper;//TODO:?
 gcd.gcdext = gcdext;//TODO:?
