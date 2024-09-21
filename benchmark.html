@@ -2,7 +2,6 @@
 import gcd from './gcd.js';
 
 function compareAgainstEuclideanAndBinary() {
-
   const LehmersGCD = gcd;
 
   function EuclideanGCD(a, b) {
@@ -128,6 +127,7 @@ function testRandomBigIntGCDPerformance(size) {
     const start = Date.now();
     let sum = 0;
     for (let i = 0; i < count; i += 1) {
+      //const [,,g] = gcd.gcdext(a[i], b[i]);
       const g = gcd(a[i], b[i]);
       sum += Number(g);
     }

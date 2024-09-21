@@ -3,6 +3,7 @@
 const SUBQUADRATIC_GCD_THRESHOLD = 32 * 1024;
 const SUBQUADRATIC_HALFGCD_THRESHOLD = 4096;
 const DOUBLE_DIGIT_METHOD = true;
+const USE_HALF_EXTENDED = true;
 
 let SMALL_GCD_MAX = 0n;
 let DIGITSIZE = 0;
@@ -338,12 +339,14 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
   extended = extended || reallyhalfgcd;
 
   let [A, B, C, D] = [1n, 0n, 0n, 1n]; // 2x2 matrix
+  let step = 0;
 
   //TODO: TEST
   if (a < 0n) {
     a = -a;
     if (extended) {
       [A, B, C, D] = [-A, -B, C, D];
+      step += 1;
     }
   }
   //TODO: TEST
@@ -351,6 +354,7 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
     b = -b;
     if (extended) {
       [A, B, C, D] = [A, B, -C, -D];
+      step += 1;
     }
   }
   if (a < b) {
@@ -359,6 +363,7 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
     b = tmp;
     if (extended) {
       [A, B, C, D] = [C, D, A, B];
+      step += 1;
     }
   }
 
@@ -374,7 +379,6 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
     }
   }
 
-  let step = 0;
   while ((reallyhalfgcd || a > SMALL_GCD_MAX) && b !== 0n) {
     //console.assert(a >= b);
     step += 1;
@@ -382,12 +386,12 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
     if (!isSmall) {
       // Subquadratic Lehmer's algorithm:
       if (!reallyhalfgcd) {
-        if (BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD, b) === b) {
+        if (BigInt.asUintN(SUBQUADRATIC_GCD_THRESHOLD * (extended ? 1 / 16 : 1), b) === b) {
           isSmall = true;
           continue;
         }
       }
-      const m = reallyhalfgcd ? Math.max(0, Math.ceil((bitLength(a) - bitLength(D < 0n ? -D : D)) * (1 / 2))) : Math.floor(bitLength(a) * (2 / 3)); // 2/3 is somehow faster
+      const m = reallyhalfgcd ? Math.max(0, Math.ceil((bitLength(a) - bitLength(D < 0n ? -D : D)) * (1 / 2))) : (extended ? 0 : Math.floor(bitLength(a) * 2 / 3)); // 2/3 is somehow faster
       const M = BigInt(m);
       if (step !== 1 && reallyhalfgcd) {
         if (((a + A) >> M) !== ((a + B) >> M) ||
@@ -404,7 +408,10 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
           if (step === 1) {
             [A, B, C, D] = [A1, B1, C1, D1];
           } else {
-            [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, C1 * A + D1 * C, C1 * B + D1 * D];
+            [B, D] = [A1 * B + B1 * D, C1 * B + D1 * D];
+            if (!USE_HALF_EXTENDED || reallyhalfgcd) {
+              [A, C] = [A1 * A + B1 * C, C1 * A + D1 * C];
+            }
           }
         }
         const alo = BigInt.asUintN(m, a);
@@ -440,7 +447,10 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
           if (step === 1) {
             [A, B, C, D] = [A1, B1, C1, D1];
           } else {
-            [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, C1 * A + D1 * C, C1 * B + D1 * D];
+            [B, D] = [A1 * B + B1 * D, C1 * B + D1 * D];
+            if (!USE_HALF_EXTENDED || reallyhalfgcd) {
+              [A, C] = [A1 * A + B1 * C, C1 * A + D1 * C];
+            }
           }
         }
         // (a, b) := T1 * (a, b):
@@ -496,15 +506,20 @@ function LehmersGCD(a, b) {
 
 function LehmersGCDExt(a, b) {
   let [A, B, C, D, a1, b1] = halfgcd(a, b, true, false);
-  a = a1;
-  b = b1;
-  if (b !== 0n) {
-    const [A1, B1, g] = smallgcdext(a, b);
-    a = BigInt.asUintN(64, g);
-    b = 0n;
-    [A, B, C, D] = [A1 * A + B1 * C, A1 * B + B1 * D, 0n, 0n];
+  if (b1 !== 0n) {
+    const [A1, B1, g] = smallgcdext(a1, b1);
+    a1 = BigInt.asUintN(64, g);
+    b1 = 0n;
+    B = A1 * B + B1 * D;
+    if (!USE_HALF_EXTENDED) {
+      A = A1 * A + B1 * C;
+    }
   }
-  return [A, B, a];
+  if (USE_HALF_EXTENDED) {
+    // A*a + B*b = g
+    A = a === 0n ? 0n : (a1 - B * b) / a; // exact division
+  }
+  return [A, B, a1];
 }
 
 function gcd(a, b) {
