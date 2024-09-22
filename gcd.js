@@ -413,22 +413,22 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         }
       }
       const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> M, b >> M);
-      if (B1 !== 0n) {
+      if (BigInt(B1) !== 0n) {
         if (extended) {
           // T := T1 * T:
           if (step === 1) {
-            A = A1;
-            B = B1;
-            C = C1;
-            D = D1;
+            A = BigInt(A1);
+            B = BigInt(B1);
+            C = BigInt(C1);
+            D = BigInt(D1);
           } else {
-            const B2 = A1 * B + B1 * D;
-            const D2 = C1 * B + D1 * D;
+            const B2 = BigInt(A1) * B + BigInt(B1) * D;
+            const D2 = BigInt(C1) * B + BigInt(D1) * D;
             B = B2;
             D = D2;
             if (!USE_HALF_EXTENDED || reallyhalfgcd) {
-              const A2 = A1 * A + B1 * C;
-              const C2 = C1 * A + D1 * C;
+              const A2 = BigInt(A1) * A + BigInt(B1) * C;
+              const C2 = BigInt(C1) * A + BigInt(D1) * C;
               A = A2;
               C = C2;
             }
@@ -437,8 +437,8 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         const alo = BigInt.asUintN(m, a);
         const blo = BigInt.asUintN(m, b);
         // (a, b) := T1 * (alo, blo) + T1 * (ahi, bhi) * 2**m:
-        const a1 = (A1 * alo + B1 * blo) + (ahi1 << M);
-        const b1 = (C1 * alo + D1 * blo) + (bhi1 << M);
+        const a1 = (BigInt(A1) * alo + BigInt(B1) * blo) + (ahi1 << M);
+        const b1 = (BigInt(C1) * alo + BigInt(D1) * blo) + (bhi1 << M);
         a = a1;
         b = b1;
         if (a < 0n || b < 0n) {
@@ -461,30 +461,30 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         }
       }
       const [A1, B1, C1, D1] = helper((m === 0 ? a : a >> M), (m === 0 ? b : b >> M));
-      if (B1 !== 0n) {
+      if (BigInt(B1) !== 0n) {
         if (extended) {
           // T := T1 * T:
           if (step === 1) {
-            A = A1;
-            B = B1;
-            C = C1;
-            D = D1;
+            A = BigInt(A1);
+            B = BigInt(B1);
+            C = BigInt(C1);
+            D = BigInt(D1);
           } else {
-            const B2 = A1 * B + B1 * D;
-            const D2 = C1 * B + D1 * D;
+            const B2 = BigInt(A1) * B + BigInt(B1) * D;
+            const D2 = BigInt(C1) * B + BigInt(D1) * D;
             B = B2;
             D = D2;
             if (!USE_HALF_EXTENDED || reallyhalfgcd) {
-              const A2 = A1 * A + B1 * C;
-              const C2 = C1 * A + D1 * C;
+              const A2 = BigInt(A1) * A + BigInt(B1) * C;
+              const C2 = BigInt(C1) * A + BigInt(D1) * C;
               A = A2;
               C = C2;
             }
           }
         }
         // (a, b) := T1 * (a, b):
-        const a1 = A1 * a + B1 * b;
-        const b1 = C1 * a + D1 * b;
+        const a1 = BigInt(A1) * a + BigInt(B1) * b;
+        const b1 = BigInt(C1) * a + BigInt(D1) * b;
         a = a1;
         b = b1;
         if (a < 0n || b < 0n) {
@@ -528,8 +528,8 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
 function LehmersGCD(a, b) {
   const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b, false, false);
-  a = a1;
-  b = b1;
+  a = BigInt(a1);
+  b = BigInt(b1);
   if (b !== 0n) {
     a = BigInt.asUintN(64, smallgcd(a, b));
   }
@@ -540,12 +540,12 @@ function LehmersGCDExt(a, b) {
   const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b, true, false);
   const a0 = a;
   const b0 = b;
-  let A = A1;
-  let B = B1;
-  let C = C1;
-  let D = D1;
-  a = a1;
-  b = b1;
+  let A = BigInt(A1);
+  let B = BigInt(B1);
+  let C = BigInt(C1);
+  let D = BigInt(D1);
+  a = BigInt(a1);
+  b = BigInt(b1);
   if (b1 !== 0n) {
     const [A1, B1, g] = smallgcdext(a, b);
     a = BigInt.asUintN(64, g);
@@ -572,12 +572,12 @@ function gcdext(a, b) {
 
 function halfgcdWrapper(a, b) {
   const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b);
-  let A = A1;
-  let B = B1;
-  let C = C1;
-  let D = D1;
-  a = a1;
-  b = b1;
+  let A = BigInt(A1);
+  let B = BigInt(B1);
+  let C = BigInt(C1);
+  let D = BigInt(D1);
+  a = BigInt(a1);
+  b = BigInt(b1);
   // reduce numbers as much as possible:
   while (b !== 0n) {
     const q = a / b;
