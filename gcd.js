@@ -338,14 +338,19 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
   }
   extended = extended || reallyhalfgcd;
 
-  let [A, B, C, D] = [1n, 0n, 0n, 1n]; // 2x2 matrix
+  // 2x2 matrix:
+  let A = 1n;
+  let B = 0n;
+  let C = 0n;
+  let D = 1n;
   let step = 0;
 
   //TODO: TEST
   if (a < 0n) {
     a = -a;
     if (extended) {
-      [A, B, C, D] = [-A, -B, C, D];
+      A = -A;
+      B = -B;
       step += 1;
     }
   }
@@ -353,7 +358,8 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
   if (b < 0n) {
     b = -b;
     if (extended) {
-      [A, B, C, D] = [A, B, -C, -D];
+      C = -C;
+      D = -D;
       step += 1;
     }
   }
@@ -362,7 +368,12 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
     a = b;
     b = tmp;
     if (extended) {
-      [A, B, C, D] = [C, D, A, B];
+      const C1 = A;
+      A = C;
+      C = C1;
+      const D1 = B;
+      B = D;
+      D = D1;
       step += 1;
     }
   }
@@ -406,11 +417,20 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         if (extended) {
           // T := T1 * T:
           if (step === 1) {
-            [A, B, C, D] = [A1, B1, C1, D1];
+            A = A1;
+            B = B1;
+            C = C1;
+            D = D1;
           } else {
-            [B, D] = [A1 * B + B1 * D, C1 * B + D1 * D];
+            const B2 = A1 * B + B1 * D;
+            const D2 = C1 * B + D1 * D;
+            B = B2;
+            D = D2;
             if (!USE_HALF_EXTENDED || reallyhalfgcd) {
-              [A, C] = [A1 * A + B1 * C, C1 * A + D1 * C];
+              const A2 = A1 * A + B1 * C;
+              const C2 = C1 * A + D1 * C;
+              A = A2;
+              C = C2;
             }
           }
         }
@@ -445,11 +465,20 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         if (extended) {
           // T := T1 * T:
           if (step === 1) {
-            [A, B, C, D] = [A1, B1, C1, D1];
+            A = A1;
+            B = B1;
+            C = C1;
+            D = D1;
           } else {
-            [B, D] = [A1 * B + B1 * D, C1 * B + D1 * D];
+            const B2 = A1 * B + B1 * D;
+            const D2 = C1 * B + D1 * D;
+            B = B2;
+            D = D2;
             if (!USE_HALF_EXTENDED || reallyhalfgcd) {
-              [A, C] = [A1 * A + B1 * C, C1 * A + D1 * C];
+              const A2 = A1 * A + B1 * C;
+              const C2 = C1 * A + D1 * C;
+              A = A2;
+              C = C2;
             }
           }
         }
@@ -481,7 +510,10 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         }
       }
       // T := {{0, 1}, {1, -q}} * T:
-      [A, B, C, D] = [C, D, C1, D1];
+      A = C;
+      B = D;
+      C = C1;
+      D = D1;
     }
     // (a, b) := {{0, 1}, {1, -q}} * (a, b)
     a = b;
@@ -505,21 +537,27 @@ function LehmersGCD(a, b) {
 }
 
 function LehmersGCDExt(a, b) {
-  let [A, B, C, D, a1, b1] = halfgcd(a, b, true, false);
+  const [A, B, C, D, a1, b1] = halfgcd(a, b, true, false);
+  const a0 = a;
+  const b0 = b;
+  let Ar = A;
+  let Br = B;
+  a = a1;
+  b = b1;
   if (b1 !== 0n) {
-    const [A1, B1, g] = smallgcdext(a1, b1);
-    a1 = BigInt.asUintN(64, g);
-    b1 = 0n;
-    B = A1 * B + B1 * D;
+    const [A1, B1, g] = smallgcdext(a, b);
+    a = BigInt.asUintN(64, g);
+    b = 0n;
+    Br = A1 * B + B1 * D;
     if (!USE_HALF_EXTENDED) {
-      A = A1 * A + B1 * C;
+      Ar = A1 * A + B1 * C;
     }
   }
   if (USE_HALF_EXTENDED) {
     // A*a + B*b = g
-    A = a === 0n ? 0n : (a1 - B * b) / a; // exact division
+    Ar = a0 === 0n ? 0n : (a - Br * b0) / a0; // exact division
   }
-  return [A, B, a1];
+  return [Ar, Br, a];
 }
 
 function gcd(a, b) {
@@ -531,7 +569,7 @@ function gcdext(a, b) {
 }
 
 function halfgcdWrapper(a, b) {
-  let [A, B, C, D, a1, b1] = halfgcd(a, b);
+  const [A, B, C, D, a1, b1] = halfgcd(a, b);
   a = a1;
   b = b1;
   // reduce numbers as much as possible:
@@ -546,7 +584,10 @@ function halfgcdWrapper(a, b) {
       break;
     }
     // T := {{0, 1}, {1, -q}} * T:
-    [A, B, C, D] = [C, D, C1, D1];
+    A = C;
+    B = D;
+    C = C1;
+    D = D1;
     // (a, b) := {{0, 1}, {1, -q}} * (a, b)
     a = b;
     b = b1;
