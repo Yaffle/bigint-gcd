@@ -527,7 +527,7 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
 // https://en.wikipedia.org/wiki/Lehmer%27s_GCD_algorithm
 // https://www.imsc.res.in/~kapil/crypto/notes/node11.html
 function LehmersGCD(a, b) {
-  const [A, B, C, D, a1, b1] = halfgcd(a, b, false, false);
+  const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b, false, false);
   a = a1;
   b = b1;
   if (b !== 0n) {
@@ -537,27 +537,29 @@ function LehmersGCD(a, b) {
 }
 
 function LehmersGCDExt(a, b) {
-  const [A, B, C, D, a1, b1] = halfgcd(a, b, true, false);
+  const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b, true, false);
   const a0 = a;
   const b0 = b;
-  let Ar = A;
-  let Br = B;
+  let A = A1;
+  let B = B1;
+  let C = C1;
+  let D = D1;
   a = a1;
   b = b1;
   if (b1 !== 0n) {
     const [A1, B1, g] = smallgcdext(a, b);
     a = BigInt.asUintN(64, g);
     b = 0n;
-    Br = A1 * B + B1 * D;
+    B = A1 * B + B1 * D;
     if (!USE_HALF_EXTENDED) {
-      Ar = A1 * A + B1 * C;
+      A = A1 * A + B1 * C;
     }
   }
   if (USE_HALF_EXTENDED) {
     // A*a + B*b = g
-    Ar = a0 === 0n ? 0n : (a - Br * b0) / a0; // exact division
+    A = a0 === 0n ? 0n : (a - B * b0) / a0; // exact division
   }
-  return [Ar, Br, a];
+  return [A, B, a];
 }
 
 function gcd(a, b) {
@@ -569,7 +571,11 @@ function gcdext(a, b) {
 }
 
 function halfgcdWrapper(a, b) {
-  const [A, B, C, D, a1, b1] = halfgcd(a, b);
+  const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b);
+  let A = A1;
+  let B = B1;
+  let C = C1;
+  let D = D1;
   a = a1;
   b = b1;
   // reduce numbers as much as possible:
