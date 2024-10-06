@@ -18,10 +18,23 @@ Usage
 =====
 
 ```
-import bigIntGCD from './node_modules/bigint-gcd/gcd.js';
+import gcd from './node_modules/bigint-gcd/gcd.js';
 
-console.log(bigIntGCD(120n, 18n));
+console.log(gcd(120n, 18n));
+
 ```
+
+There is also an implementation of the Extended Euclidean algorithm, which is useful to find the multiplicative modular inverse:
+```
+console.log(gcd.gcdext(3n, 5n)); // [2n, -1n, 1n]
+```
+
+And "Half GCD" which is useful to do the [Rational reconstruction](https://en.wikipedia.org/wiki/Rational_reconstruction_(mathematics)):
+It returns the transformation matrix and the transformed values after applying about half of the Euclidean steps.
+```
+console.log(gcd.halfgcd(1000000n, 1234567n)); // [-16n, 13n, 21n, -17n, 49371n, 12361n]
+```
+
 
 
 Performance:
