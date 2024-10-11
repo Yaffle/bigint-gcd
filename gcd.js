@@ -332,7 +332,20 @@ function helper(X, Y) {
   //  return [A, B, C, D, a, b];
   //}
 
-function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
+function abs(a) {
+  if (typeof a !== 'bigint') {
+    throw new TypeError();
+  }
+  return a < 0n ? -a : a;
+}
+function max(a, b) {
+  if (typeof a !== 'bigint' || typeof b !== 'bigint') {
+    throw new TypeError();
+  }
+  return a < b ? b : a;
+}
+
+function halfgcd(a, b, extended = true, reallyhalfgcd = true, wrapper = false) {
   if (typeof a !== 'bigint' || typeof b !== 'bigint') {
     throw new TypeError();
   }
@@ -389,6 +402,9 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
       isSmall = true;
     }
   }
+  const sizea0 = reallyhalfgcd ? bitLength(a) : 0;
+
+  let isVerySmall = false;
 
   while ((reallyhalfgcd || a > SMALL_GCD_MAX) && b !== 0n) {
     //console.assert(a >= b);
@@ -402,33 +418,52 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
           continue;
         }
       }
-      const m = reallyhalfgcd ? Math.max(0, Math.ceil((bitLength(a) - bitLength(D < 0n ? -D : D)) * (1 / 2))) : (extended ? 0 : Math.floor(bitLength(a) * 2 / 3)); // 2/3 is somehow faster
-      const M = BigInt(m);
+      const s1 = reallyhalfgcd ? bitLength(max(abs(C), abs(D))) : 0;
+      let m = reallyhalfgcd ? Math.max(0, Math.ceil((sizea0 - s1 - s1) * (1 / 2))) : (extended ? 0 : Math.floor(bitLength(a) * 2 / 3)); // 2/3 is somehow faster
+      let M = BigInt(m);
       if (step !== 1 && reallyhalfgcd) {
-        if (((a + A) >> M) !== ((a + B) >> M) ||
-            ((b + C) >> M) !== ((b + D) >> M)) {
-          // min and max values have different high bits
+        if (m < 256) {
+          //if (s1 / sizea0 < 0.46) {
+          //  console.debug(s1 / sizea0);
+          //}
           isSmall = true;
           continue;
         }
+        //if (s1 / sizea0 > 0.251) {
+        //  console.debug(s1 / sizea0);
+        //}
+        let k = 8;
+        while (((a + A) >> M) !== ((a + B) >> M) ||
+               ((b + C) >> M) !== ((b + D) >> M)) {
+          // min and max values have different high bits
+          //isSmall = true;
+          //continue;
+          m += k;
+          M = BigInt(m);
+          k += k;
+        }
       }
-      const [A1, B1, C1, D1, ahi1, bhi1] = halfgcd(a >> M, b >> M);
-      if (BigInt(B1) !== 0n) {
+      const [$A1, $B1, $C1, $D1, $ahi1, $bhi1] = halfgcd(a >> M, b >> M);
+      const [A1, B1, C1, D1, ahi1, bhi1] = [BigInt($A1), BigInt($B1), BigInt($C1), BigInt($D1), BigInt($ahi1), BigInt($bhi1)];
+      //if (typeof A1 !== 'bigint' || typeof B1 !== 'bigint' || typeof C1 !== 'bigint' || typeof D1 !== 'bigint' || typeof ahi1 !== 'bigint' || typeof bhi1 !== 'bigint') {
+        //throw new TypeError();
+      //}
+      if (B1 !== 0n) {
         if (extended) {
           // T := T1 * T:
           if (step === 1) {
-            A = BigInt(A1);
-            B = BigInt(B1);
-            C = BigInt(C1);
-            D = BigInt(D1);
+            A = A1;
+            B = B1;
+            C = C1;
+            D = D1;
           } else {
-            const B2 = BigInt(A1) * B + BigInt(B1) * D;
-            const D2 = BigInt(C1) * B + BigInt(D1) * D;
+            const B2 = A1 * B + B1 * D;
+            const D2 = C1 * B + D1 * D;
             B = B2;
             D = D2;
             if (!USE_HALF_EXTENDED || reallyhalfgcd) {
-              const A2 = BigInt(A1) * A + BigInt(B1) * C;
-              const C2 = BigInt(C1) * A + BigInt(D1) * C;
+              const A2 = A1 * A + B1 * C;
+              const C2 = C1 * A + D1 * C;
               A = A2;
               C = C2;
             }
@@ -437,8 +472,8 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         const alo = BigInt.asUintN(m, a);
         const blo = BigInt.asUintN(m, b);
         // (a, b) := T1 * (alo, blo) + T1 * (ahi, bhi) * 2**m:
-        const a1 = (BigInt(A1) * alo + BigInt(B1) * blo) + (ahi1 << M);
-        const b1 = (BigInt(C1) * alo + BigInt(D1) * blo) + (bhi1 << M);
+        const a1 = (A1 * alo + B1 * blo) + (ahi1 << M);
+        const b1 = (C1 * alo + D1 * blo) + (bhi1 << M);
         a = a1;
         b = b1;
         if (a < 0n || b < 0n) {
@@ -449,42 +484,57 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       }
     }
-    if (isSmall) {
+    if (isSmall && !isVerySmall) {
       // Lehmer's algorithm:
-      const m = Math.max(0, bitLength2(a) - DIGITSIZE * (DOUBLE_DIGIT_METHOD ? 2 : 1));
-      const M = m === 0 ? 0n : BigInt(m);
+      let m = Math.max(0, bitLength2(a) - DIGITSIZE * (DOUBLE_DIGIT_METHOD ? 2 : 1));
+      let M = m === 0 ? 0n : BigInt(m);
       if (step !== 1 && reallyhalfgcd) {
         if (((a + A) >> M) !== ((a + B) >> M) ||
             ((b + C) >> M) !== ((b + D) >> M)) {
           // min and max values have different high bits
-          break;
+          if (!wrapper) {
+            break;
+          }
+          do {
+            m += 8;
+            M = BigInt(m);
+          } while (((a + A) >> M) !== ((a + B) >> M) ||
+                   ((b + C) >> M) !== ((b + D) >> M));
+          if ((b >> M) === 0n) {
+            isVerySmall = true;
+            continue;
+          }
         }
       }
-      const [A1, B1, C1, D1] = helper((m === 0 ? a : a >> M), (m === 0 ? b : b >> M));
-      if (BigInt(B1) !== 0n) {
+      const [$A1, $B1, $C1, $D1] = helper((m === 0 ? a : a >> M), (m === 0 ? b : b >> M));
+      const [A1, B1, C1, D1] = [BigInt($A1), BigInt($B1), BigInt($C1), BigInt($D1)];
+      //if (typeof A1 !== 'bigint' || typeof B1 !== 'bigint' || typeof C1 !== 'bigint' || typeof D1 !== 'bigint') {
+        //throw new TypeError();
+      //}
+      if (B1 !== 0n) {
         if (extended) {
           // T := T1 * T:
           if (step === 1) {
-            A = BigInt(A1);
-            B = BigInt(B1);
-            C = BigInt(C1);
-            D = BigInt(D1);
+            A = A1;
+            B = B1;
+            C = C1;
+            D = D1;
           } else {
-            const B2 = BigInt(A1) * B + BigInt(B1) * D;
-            const D2 = BigInt(C1) * B + BigInt(D1) * D;
+            const B2 = A1 * B + B1 * D;
+            const D2 = C1 * B + D1 * D;
             B = B2;
             D = D2;
             if (!USE_HALF_EXTENDED || reallyhalfgcd) {
-              const A2 = BigInt(A1) * A + BigInt(B1) * C;
-              const C2 = BigInt(C1) * A + BigInt(D1) * C;
+              const A2 = A1 * A + B1 * C;
+              const C2 = C1 * A + D1 * C;
               A = A2;
               C = C2;
             }
           }
         }
         // (a, b) := T1 * (a, b):
-        const a1 = BigInt(A1) * a + BigInt(B1) * b;
-        const b1 = BigInt(C1) * a + BigInt(D1) * b;
+        const a1 = A1 * a + B1 * b;
+        const b1 = C1 * a + D1 * b;
         a = a1;
         b = b1;
         if (a < 0n || b < 0n) {
@@ -495,7 +545,7 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true) {
         //console.assert(A1 === 1n && B1 === 0n && C1 === 0n && D1 === 1n);
       }
     }
-    
+
     //console.debug('%');
     const q = a / b;
     const b1 = a - q * b;
@@ -571,35 +621,8 @@ function gcdext(a, b) {
 }
 
 function halfgcdWrapper(a, b) {
-  const [A1, B1, C1, D1, a1, b1] = halfgcd(a, b);
-  let A = BigInt(A1);
-  let B = BigInt(B1);
-  let C = BigInt(C1);
-  let D = BigInt(D1);
-  a = BigInt(a1);
-  b = BigInt(b1);
   // reduce numbers as much as possible:
-  while (b !== 0n) {
-    const q = a / b;
-    const b1 = a - q * b;
-    const C1 = A - q * C;
-    const D1 = B - q * D;
-    const sameQuotient = 0n <= b1 + C1 && b1 + C1 < b + C &&
-                         0n <= b1 + D1 && b1 + D1 < b + D;
-    if (!sameQuotient) {
-      break;
-    }
-    // T := {{0, 1}, {1, -q}} * T:
-    A = C;
-    B = D;
-    C = C1;
-    D = D1;
-    // (a, b) := {{0, 1}, {1, -q}} * (a, b)
-    a = b;
-    b = b1;
-    //gcd.debug(q);
-  }
-  return [A, B, C, D, a, b];
+  return halfgcd(a, b, true, true, true);
 }
 
 export default gcd;

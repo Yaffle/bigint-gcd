@@ -17,14 +17,17 @@ end
 function testRandomBigIntGCDPerformance()
     for s in 6:(23)
         size=2^s
-        e = 7 - floor(Int, round(log2(size)) / 3)
-        count = 10^max(e, 0)
+        e = 23 - floor(Int, round(log2(size)))
+        count = 2^max(e, 0)
         a = Vector{BigInt}(undef, count)
         b = Vector{BigInt}(undef, count)
 
         for i in 1:count
             a[i] = (randomBigInt(size) >> (size >= 2^20 ? big(64) : big(2))) * big(3)
             b[i] = (randomBigInt(size) >> (size >= 2^20 ? big(64) : big(2))) * big(3)
+            #while (gcd(a[i], b[i]) != 1)
+            #   b[i] += 1;
+            #end
         end
 
         start = now()
@@ -36,7 +39,7 @@ function testRandomBigIntGCDPerformance()
             sum += Int(g & 0xFFFF)
         end
         elapsed = (now() - start) / Millisecond(1)
-        @printf("%d %.6fms %d\n", size, elapsed / count, sum)
+        @printf("%d %.5f0ms %d\n", size, elapsed / count, sum)
     end
 end
 

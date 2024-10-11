@@ -85,20 +85,26 @@ function compareAgainstEuclideanAndBinary() {
 
   test(a1, b1, LehmersGCD);
   // default: 426.200927734375 ms
+  // 130ms
   test(a1, b1, EuclideanGCD);
   // default: 1136.77294921875 ms
+  // 930ms
   test(a1, b1, BinaryGCD);
   // default: 1456.793212890625 ms
+  // 770ms
 
   const a = FibonacciNumber(186n);
   const b = FibonacciNumber(186n - 1n);
 
   test(a, b, LehmersGCD);
   // default: 459.796875 ms
+  // 170ms
   test(a, b, EuclideanGCD);
   // default: 2565.871826171875 ms
+  // 2240ms
   test(a, b, BinaryGCD);
   // default: 1478.333984375 ms
+  // 770ms
 }
 
 setTimeout(() => {
@@ -116,8 +122,8 @@ function randomBigInt(size, random = Math.random) {
 function testRandomBigIntGCDPerformance(size) {
   // TODO: 30, 53
   if (size <= 8 * 1024 * 1024) {
-    const e = 7 - Math.floor(Math.round(Math.log2(size)) / 3);
-    const count = Math.pow(10, Math.max(e, 0));
+    const e = 23 - Math.round(Math.log2(size));
+    const count = Math.pow(2, Math.max(e, 0));
     const a = new Array(count);
     const b = new Array(count);
     for (let i = 0; i < count; i += 1) {
@@ -127,15 +133,16 @@ function testRandomBigIntGCDPerformance(size) {
     const start = Date.now();
     let sum = 0;
     for (let i = 0; i < count; i += 1) {
-      //const [,,g] = gcd.gcdext(a[i], b[i]);
       const g = gcd(a[i], b[i]);
+      //const [,,g] = gcd.gcdext(a[i], b[i]);
+      //const [A, B, C, D, g, b1] = gcd.halfgcd(a[i], b[i]);
       sum += Number(g);
     }
     const end = Date.now();
     //console.log(end - start, count);
     console.log(size, ((end - start) / count).toFixed(6) + "ms", sum);
     const div = document.createElement('div');
-    div.textContent = size + ' ' + ((end - start) / count).toFixed(6) + "ms" + ' ' + sum;
+    div.textContent = size + ' ' + ((end - start) / count).toFixed(5) + "0ms" + ' ' + sum;
     document.body.appendChild(div);
     window.requestIdleCallback(function () {
       testRandomBigIntGCDPerformance(size * 2);
