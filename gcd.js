@@ -402,9 +402,9 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true, wrapper = false) {
       isSmall = true;
     }
   }
-  const sizea0 = reallyhalfgcd ? bitLength(a) : 0;
 
   let isVerySmall = false;
+  let sizea0 = 0;
 
   while ((reallyhalfgcd || a > SMALL_GCD_MAX) && b !== 0n) {
     //console.assert(a >= b);
@@ -417,6 +417,9 @@ function halfgcd(a, b, extended = true, reallyhalfgcd = true, wrapper = false) {
           isSmall = true;
           continue;
         }
+      }
+      if (reallyhalfgcd && step === 1) {
+        sizea0 = bitLength(a);
       }
       const s1 = reallyhalfgcd ? bitLength(max(abs(C), abs(D))) : 0;
       let m = reallyhalfgcd ? Math.max(0, Math.ceil((sizea0 - s1 - s1) * (1 / 2))) : (extended ? 0 : Math.floor(bitLength(a) * 2 / 3)); // 2/3 is somehow faster
