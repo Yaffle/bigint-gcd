@@ -122,7 +122,7 @@ function randomBigInt(size, random = Math.random) {
 function testRandomBigIntGCDPerformance(size, w) {
   // TODO: 30, 53
   if (size <= 8 * 1024 * 1024) {
-    const e = 23 - Math.round(Math.log2(size)) + 1;
+    const e = 23 - Math.round(Math.log2(size)) + 1 + (w >= 2 ? 1 : 0);
     const count = Math.pow(2, Math.max(e, 0));
     const a = new Array(count);
     const b = new Array(count);

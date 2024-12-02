@@ -17,7 +17,7 @@ end
 function testRandomBigIntPerformance(w)
     for s in 6:(23)
         size=2^s
-        e = 23 - floor(Int, round(log2(size))) + 1
+        e = 23 - floor(Int, round(log2(size))) + 1 + (w >= 2 ? 1 : 0)
         count = 2^max(e, 0)
         a = Vector{BigInt}(undef, count)
         b = Vector{BigInt}(undef, count)
