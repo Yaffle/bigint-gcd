@@ -119,24 +119,40 @@ function randomBigInt(size, random = Math.random) {
   return (randomBigInt(size - q, random) << BigInt(q)) | randomBigInt(q, random);
 }
 
-function testRandomBigIntGCDPerformance(size) {
+function testRandomBigIntGCDPerformance(size, w) {
   // TODO: 30, 53
   if (size <= 8 * 1024 * 1024) {
-    const e = 23 - Math.round(Math.log2(size));
+    const e = 23 - Math.round(Math.log2(size)) + 1;
     const count = Math.pow(2, Math.max(e, 0));
     const a = new Array(count);
     const b = new Array(count);
     for (let i = 0; i < count; i += 1) {
-      a[i] = (BigInt(randomBigInt(size)) >> (size >= 2**20 ? 64n : 2n)) * 3n;
-      b[i] = (BigInt(randomBigInt(size)) >> (size >= 2**20 ? 64n : 2n)) * 3n;
+      a[i] = BigInt(randomBigInt(w === 3 || w === 4 ? size * 2 : size));
+      b[i] = BigInt(randomBigInt(w === 3 || w === 4 ? size - 2 : size));
     }
     const start = Date.now();
     let sum = 0;
+    let g = 0n;
     for (let i = 0; i < count; i += 1) {
-      const g = gcd(a[i], b[i]);
-      //const [,,g] = gcd.gcdext(a[i], b[i]);
-      //const [A, B, C, D, g, b1] = gcd.halfgcd(a[i], b[i]);
-      sum += Number(g);
+      if (w === 0) {
+        g = gcd(a[i], b[i]);
+      }
+      if (w === 1) {
+        [,,g] = gcd.gcdext(a[i], b[i]);
+      }
+      if (w === 2) {
+        g = a[i] * b[i];
+      }
+      if (w === 3) {
+        g = a[i] / b[i];
+      }
+      if (w === 4) {
+        g = a[i] % b[i];
+      }
+      //if (w === 5) {
+      //  [A, B, C, D, g, b1] = gcd.halfgcd(a[i], b[i]);
+      //}
+      sum += Number(g & 0xFFFFn);
     }
     const end = Date.now();
     //console.log(end - start, count);
@@ -145,13 +161,17 @@ function testRandomBigIntGCDPerformance(size) {
     div.textContent = size + ' ' + ((end - start) / count).toFixed(5) + "0ms" + ' ' + sum;
     document.body.appendChild(div);
     window.requestIdleCallback(function () {
-      testRandomBigIntGCDPerformance(size * 2);
+      testRandomBigIntGCDPerformance(size * 2, w);
+    });
+  } else if (w < 4) {
+    window.requestIdleCallback(function () {
+      testRandomBigIntGCDPerformance(64, w + 1);
     });
   }
 }
 
 setTimeout(() => {
-  testRandomBigIntGCDPerformance(64);
+  testRandomBigIntGCDPerformance(64, 0);
 }, 10);
 
 </script>
