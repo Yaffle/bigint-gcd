@@ -625,16 +625,16 @@ function gcdext(a, b) {
   return LehmersGCDExt(BigInt(a), BigInt(b));
 }
 
-function invmod(a, b) {
-  const [A, B, C, D, a1, b1] = halfgcd(a, b, true, false);
+function invmod(a, m) {
+  const [A, B, C, D, a1, b1] = halfgcd(m, a, true, false);
   if (BigInt(b1) !== 0n) {
-    const [A1, B1, g] = smallgcdext(a, b);
+    const [A1, B1, g] = smallgcdext(a1, b1);
     if (BigInt.asUintN(64, g) !== 1n) {
       return 0n;
     }
     const B2 = A1 * BigInt(B) + B1 * BigInt(D);
     if (B2 < 0n) {
-      return B2 + b;
+      return B2 + m;
     }
     return B2;
   }
@@ -643,7 +643,7 @@ function invmod(a, b) {
   }
   const B1 = BigInt(B);
   if (B1 < 0n) {
-    return B1 + b;
+    return B1 + m;
   }
   return B1;
 }
