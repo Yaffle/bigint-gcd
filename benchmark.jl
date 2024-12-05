@@ -3,21 +3,13 @@ using Printf
 using Dates
 
 function randomBigInt(size)
-    if size <= 52
-        return big(floor(Int, rand() * 2^size))
-    end
-    q = ceil(Int, size / (2 * 52)) * 52
-    return (randomBigInt(size - q) << big(q)) | randomBigInt(q)
+    return rand(BigInt(0):BigInt(2)^size - 1)
 end
-
-#function randomBigInt(size)
-#    return rand(BigInt(0):BigInt(2)^size - 1)
-#end
 
 function testRandomBigIntPerformance(w)
     for s in 6:(23)
         size=2^s
-        e = 23 - floor(Int, round(log2(size))) + 1 + (w >= 2 ? 1 : 0)
+        e = 23 - floor(Int, round(log2(size))) + 1 + (w >= 2 ? 2 : 0)
         count = 2^max(e, 0)
         a = Vector{BigInt}(undef, count)
         b = Vector{BigInt}(undef, count)
@@ -38,7 +30,8 @@ function testRandomBigIntPerformance(w)
               g = gcd(a[i], b[i])
             end
             if (w == 1)
-              g, u, v = gcdx(a[i], b[i])
+              #g, u, v = gcdx(a[i], b[i])
+              g = invmod(a[i], b[i])
             end
             if (w == 2)
               g = a[i] * b[i]
